@@ -15,7 +15,15 @@ function load_generated_functions()
     end
 end
 
-export load_generated_functions
+macro load_generated_functions()
+    quote
+        for function_defn in generated_functions
+            Core.eval($__module__, function_defn)
+        end
+    end
+end
+
+export load_generated_functions, @load_generated_functions
 
 # built-in extensions to the reverse mode AD
 include("backprop.jl")

@@ -178,11 +178,15 @@ function Base.haskey(dict::Diffed{T,DictDiff{K,V}}, key::Union{Diffed{K,NoChange
 end
 
 function Base.getindex(dict::Diffed{T,DT}, key::Diffed{K,DK}) where {K, V, T  <: AbstractDict{K,V}, DT, DK}
-    result = getindex(strip_diff(dict), key)
+    result = getindex(strip_diff(dict), strip_diff(key))
     Diffed(result, UnknownChange())
 end
 
-function Base.getindex(dict::Diffed{T,NoChange}, key::Union{Diffed{K,NoChange},K}) where {K, V, T <: AbstractDict{K,V}}
+function Base.getindex(dict::Diffed{T,NoChange}, key::Diffed{K,NoChange}) where {K, V, T <: AbstractDict{K,V}}
+    result = getindex(strip_diff(dict), strip_diff(key))
+    Diffed(result, NoChange())
+end
+function Base.getindex(dict::Diffed{T,NoChange}, key::K) where {K, V, T <: AbstractDict{K,V}}
     result = getindex(strip_diff(dict), key)
     Diffed(result, NoChange())
 end
@@ -351,8 +355,14 @@ function Base.fill(value::Diffed{V,NoChange}, n::Diffed{U,NoChange}) where {V,U 
 end
 
 function Base.fill(value::Diffed{V,DV}, n::Diffed{U,NoChange}) where {V,U <: Integer,DV}
-    result = fill(strip_diff(value), strip_diff(n))
-    Diffed(result, UnknownChange())
+    n = strip_diff(n)
+    result = fill(strip_diff(value), n)
+    Diffed(result, VectorDiff(n, n, Dict(i => get_diff(value) for i=1:n)))
+end
+
+function Base.fill(value::Diffed{V, DV}, n::U) where {V, DV, U<:Integer}
+    result = fill(strip_diff(value), n)
+    Diffed(result, VectorDiff(n, n, Dict(i => get_diff(value) for i=1:n)))
 end
 
 function Base.fill(value::Diffed{V,DV}, n::Diffed{U,DU}) where {V,U <: Integer,DU,DV}
