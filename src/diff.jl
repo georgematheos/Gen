@@ -48,10 +48,10 @@ struct NoChange <: Diff end
 struct SetDiff{V} <: Diff
 
     # elements that were added
-    added::Set{V}
+    added::AbstractSet{V}
 
     # elements that were deleted
-    deleted::Set{V}
+    deleted::AbstractSet{V}
 end
 
 struct DictDiff{K,V} <: Diff

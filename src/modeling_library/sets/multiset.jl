@@ -1,6 +1,3 @@
-import FunctionalCollections
-
-export MultiSet, remove_one, setmap
 
 struct MultiSet{T}
     counts::PersistentHashMap
@@ -69,7 +66,3 @@ function Base.iterate(ms::MultiSet{T}, (key, cnt, st)) where T
     end
 end
 
-function setmap(f, set)
-    vals = [f(el) for el in set]
-    MultiSet(vals)
-end
