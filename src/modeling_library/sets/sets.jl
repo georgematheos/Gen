@@ -5,9 +5,9 @@ using FunctionalCollections: PersistentSet, disj
 # include("tracked_union.jl")
 include("multiset.jl")
 include("set_map.jl")
-# include("set_map_combinators.jl")
+include("set_map_combinators.jl")
 
 export SetMap, NoCollisionSetMap
 export set_map, no_collision_set_map
 # export tracked_union
-export MultiSet
+export MultiSet, remove_one

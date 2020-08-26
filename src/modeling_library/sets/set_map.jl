@@ -10,12 +10,12 @@ end
 struct DeterministicNoCollisionSetMap <: CustomUpdateGF{PersistentSet, PersistentSet} end
 no_collision_set_map = DeterministicNoCollisionSetMap()
 (d::DeterministicNoCollisionSetMap)(args...) = Gen.apply_with_state(d, args)[1]
-function Gen.apply_with_state(::DeterministicNoCollisionSetMap, args::Tuple{<:Function, <:AbstractSet})
+function Gen.apply_with_state(::DeterministicNoCollisionSetMap, args::Tuple{<:Function, <:Any})
     (f, set) = args
     mapped = PersistentSet([f(el) for el in set])
     return (mapped, mapped)
 end
-function Gen.update_with_state(::DeterministicNoCollisionSetMap, out_set, args::Tuple{<:Function, <:AbstractSet},
+function Gen.update_with_state(::DeterministicNoCollisionSetMap, out_set, args::Tuple{<:Function, <:Any},
     argdiffs::Tuple{NoChange, SetDiff}
 )
     f = args[1]
@@ -34,7 +34,7 @@ function Gen.update_with_state(::DeterministicNoCollisionSetMap, out_set, args::
     end
     (out_set, out_set, SetDiff(added, removed))
 end
-function Gen.update_with_state(d::DeterministicNoCollisionSetMap, out_set, args::Tuple{<:Function, <:AbstractSet},
+function Gen.update_with_state(d::DeterministicNoCollisionSetMap, out_set, args::Tuple{<:Function, <:Any},
     argdiffs::Tuple{<:Diff, <:Diff}
 )
     (Gen.apply_with_state(d, args)..., UnknownChange())

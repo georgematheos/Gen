@@ -218,6 +218,7 @@ function _show_pretty(io::IO, tree::AddressTree, pre, vert_bars::Tuple)
         if subtree isa AddressTreeLeaf
             print(io, (cur == n ? indent_last_str : indent_str) * "$(repr(key)) : $subtree\n")
         else
+            if isempty(subtree); continue; end;
             print(io, (cur == n ? indent_last_str : indent_str) * "$(repr(key))\n")
             _show_pretty(io, subtree, pre + 4, cur == n ? (vert_bars...,) : (vert_bars..., pre+1))
         end

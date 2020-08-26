@@ -46,12 +46,14 @@ The value did not change.
 struct NoChange <: Diff end
 
 struct SetDiff{V} <: Diff
-
     # elements that were added
-    added::AbstractSet{V}
+    added::AbstractSet{<:V}
 
     # elements that were deleted
-    deleted::AbstractSet{V}
+    deleted::AbstractSet{<:V}
+
+    SetDiff(a, d) = new{Any}(a, d)
+    SetDiff{V}(a, d) where V = new{V}(a, d)
 end
 
 struct DictDiff{K,V} <: Diff
@@ -159,17 +161,17 @@ end
 
 # TODO handle case where the set is itself a constant but the element is a Diffed
 
-function Base.length(set::Diffed{T,UnknownChange}) where {V, T <: AbstractSet{V}}
+function Base.length(set::Diffed{T,UnknownChange}) where {V, T <: AbstractSet{<:V}}
     result = length(strip_diff(set))
     Diffed(result, UnknownChange())
 end
 
-function Base.length(set::Diffed{T,NoChange}) where {V, T <: AbstractSet{V}}
+function Base.length(set::Diffed{T,NoChange}) where {V, T <: AbstractSet{<:V}}
     result = length(strip_diff(set))
     Diffed(result, NoChange())
 end
 
-function Base.length(set::Diffed{T,SetDiff{V}}) where {V, T <: AbstractSet{V}}
+function Base.length(set::Diffed{T,SetDiff{V}}) where {V, T <: AbstractSet{<:V}}
     result = length(strip_diff(set))
     n_added = length(get_diff(set).added)
     n_deleted = length(get_diff(set).deleted)
@@ -246,12 +248,14 @@ function Base.length(vec::Diffed{T,VectorDiff}) where {T <: Union{AbstractVector
     end
 end
 
-function Base.collect(T::Type, v::Diffed{U, NoChange}) where {U <: Union{AbstractVector, Tuple}}
+function Base.collect(T::Type, v::Diffed{<:Any, NoChange})
     Diffed(collect(T, strip_diff(v)), NoChange())
 end
-function Base.collect(T::Type, v::Diffed{U, UnknownChange}) where {U <: Union{AbstractVector, Tuple}}
+function Base.collect(T::Type, v::Diffed{<:Any, <:Diff})
     Diffed(collect(T, strip_diff(v)), UnknownChange())
 end
+Base.collect(v::Diffed{<:Any, NoChange}) = Diffed(collect(strip_diff(v)), NoChange())
+Base.collect(v::Diffed{<:Any, <:Diff}) = Diffed(collect(strip_diff(v)), UnknownChange())
 # TODO: vector diff
 
 # TODO: we know that indeices before teh deleted/inserted idnex have not been changed

@@ -1,4 +1,4 @@
-using FunctionalCollections: push, disj
+using FunctionalCollections: push, disj, PersistentSet
 @testset "multiset" begin
     ms = MultiSet()
     @test ms isa MultiSet{Any}
@@ -31,7 +31,8 @@ using FunctionalCollections: push, disj
     end
     @test total == 2+1+2+5
 
-    @test setmap(x -> x^2, Set([-2, -1, 0, 1])) == MultiSet([4, 1, 1, 0])
+    @test set_map(x -> x^2, Set([-2, -1, 0, 1])) == MultiSet([4, 1, 1, 0])
+    @test no_collision_set_map(x -> x^3, Set([-2, -1, 0, 1])) == PersistentSet([-8, -1, 0, 1])
 end
 
 @testset "SetMap" begin
@@ -64,4 +65,43 @@ end
     @test isapprox(weight, expected_weight)
     @test isapprox(get_score(new_tr), sum(logpdf(categorical, tr[priors[i]], priors[i]) for i=1:2))
     @test discard == choicemap((priors[3], tr[priors[3]]))
+end
+
+@testset "no collision set map" begin
+    priors = [
+        [0.5, 0.5, 0., 0., 0., 0.],
+        [0., 0., 0.3, 0.7, 0., 0.],
+        [0., 0., 0., 0., 0.1, 0.9]
+    ]
+    tr = simulate(NoCollisionSetMap(categorical), (Set(priors),))
+    exp_score = sum(logpdf(categorical, tr[priors[i]], priors[i]) for i=1:3)
+    @test isapprox(get_score(tr), exp_score)
+
+    tr, weight = generate(NoCollisionSetMap(categorical), (Set(priors),), choicemap((priors[1], 2)))
+    @test tr[priors[1]] == 2
+    @test tr[priors[2]] in (3, 4)
+    @test tr[priors[3]] in (5, 6)
+    @test get_retval(tr) isa PersistentSet
+    @test isapprox(weight, log(0.5))
+
+    new_tr, weight, retdiff, discard = update(tr, (Set(priors[1:2]),), (SetDiff(Set(), Set{Any}([priors[3]])),), EmptyAddressTree(), AllSelection())
+    @test retdiff isa SetDiff
+    @test length(retdiff.deleted) == 1
+    @test tr[priors[3]] in retdiff.deleted
+    @test length(retdiff.added) == 0
+    @test isapprox(weight, -logpdf(categorical, tr[priors[3]], priors[3]))
+    @test length(collect(get_subtrees_shallow(discard))) == 1
+    @test discard[priors[3]] == tr[priors[3]]
+    @test isapprox(get_score(new_tr) - get_score(tr), weight)
+
+
+    new_tr, weight, retdiff, discard = update(tr, (Set(priors[1:2]),), (SetDiff(Set(), Set([priors[3]])),), choicemap((priors[1], 1)), AllSelection())
+    @test retdiff isa SetDiff
+    @test retdiff.deleted == Set([tr[priors[3]], 2])
+    @test retdiff.added == Set([1])
+    @test isapprox(weight, -logpdf(categorical, tr[priors[3]], priors[3]))
+    @test length(collect(get_subtrees_shallow(discard))) == 2
+    @test discard[priors[3]] == tr[priors[3]]
+    @test discard[priors[1]] == 2
+    @test isapprox(get_score(new_tr) - get_score(tr), weight)
 end
