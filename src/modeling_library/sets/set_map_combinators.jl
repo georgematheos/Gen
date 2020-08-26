@@ -10,10 +10,10 @@ struct SetTraceChoiceMap <: AddressTree{Value}
     tr::SetTrace
 end
 function get_subtree(stcm::SetTraceChoiceMap, addr)
-    get_choices(stcm.tr.subtraces[addr])
+    haskey(stcm.tr.subtraces, addr) ? get_choices(stcm.tr.subtraces[addr]) : EmptyAddressTree()
 end
 get_subtree(stcm::SetTraceChoiceMap, addr::Pair) = _get_subtree(stcm, addr)
-get_subtrees_shallow(stcm::SetTraceChoiceMap) = ((addr, get_choices(tr) for (addr, tr) in stcm.tr.subtraces))
+get_subtrees_shallow(stcm::SetTraceChoiceMap) = ((addr, get_choices(tr)) for (addr, tr) in stcm.tr.subtraces)
 
 get_choices(trace::SetTrace) = SetTraceChoiceMap(trace)
 get_retval(trace::SetTrace{true}) = set_map(((_, tr),) -> get_retval(tr), trace.subtraces)
@@ -150,19 +150,28 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, ::Tuple{<:D
             weight += wt
             set_subtree!(discard, item, this_discard)
         else
-            tr, weight = generate(tr.gen_fn.kernel, (item,), get_subspec(spec, item))
-            score += get_score(tr)
-            noise += project(tr, EmptyAddressTree())
-            new_subtraces = assoc(new_subtraces, item, tr)
+            subtr, weight = generate(tr.gen_fn.kernel, (item,), get_subtree(spec, item))
+            score += get_score(subtr)
+            noise += project(subtr, EmptyAddressTree())
+            new_subtraces = assoc(new_subtraces, item, subtr)
         end
     end
-    for (item, tr) in tr.subtraces
+    for (item, subtr) in tr.subtraces
         if !(item in set)
             ext_const = get_subtree(ext_const_addrs, item)
-            weight -= project(tr, addrs(get_selected(get_choices(tr), ext_const)))
-            set_subtree!(discard, item, get_choices(tr))
+            weight -= project(subtr, addrs(get_selected(get_choices(tr), ext_const)))
+            set_subtree!(discard, item, get_choices(subtr))
         end
     end
-    tr = SetTrace{ac, ArgType, TraceType}(tr.gen_fn, new_subtraces, (set,), score, noise)
-    return (tr, weight, UnknownChange(), discard)
+    new_tr = SetTrace{ac, ArgType, TraceType}(tr.gen_fn, new_subtraces, (set,), score, noise)
+
+    if ac
+        retdiff = UnknownChange()
+    else
+        added = Set(item for item in get_retval(new_tr) if !(item in get_retval(tr)))
+        deleted = Set(item for item in get_retval(tr) if !(item in get_retval(new_tr)))
+        retdiff = SetDiff(added, deleted)
+    end
+
+    return (new_tr, weight, retdiff, discard)
 end

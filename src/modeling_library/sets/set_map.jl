@@ -16,7 +16,7 @@ function Gen.apply_with_state(::DeterministicNoCollisionSetMap, args::Tuple{<:Fu
     return (mapped, mapped)
 end
 function Gen.update_with_state(::DeterministicNoCollisionSetMap, out_set, args::Tuple{<:Function, <:Any},
-    argdiffs::Tuple{NoChange, SetDiff}
+    argdiffs::Tuple{NoChange, <:SetDiff}
 )
     f = args[1]
     setdiff = argdiffs[2]
