@@ -35,7 +35,7 @@ using FunctionalCollections: push, disj, PersistentSet
     @test no_collision_set_map(x -> x^3, Set([-2, -1, 0, 1])) == PersistentSet([-8, -1, 0, 1])
 end
 
-@testset "SetMap" begin
+@testset "SetMap combinator" begin
     priors = [
         [0.1, 0.3, 0.6],
         [0.2, 0.6, 0.2],
@@ -67,7 +67,7 @@ end
     @test discard == choicemap((priors[3], tr[priors[3]]))
 end
 
-@testset "no collision set map" begin
+@testset "NoCollisionSetMap combinator" begin
     priors = [
         [0.5, 0.5, 0., 0., 0., 0.],
         [0., 0., 0.3, 0.7, 0., 0.],
@@ -104,4 +104,26 @@ end
     @test discard[priors[3]] == tr[priors[3]]
     @test discard[priors[1]] == 2
     @test isapprox(get_score(new_tr) - get_score(tr), weight)
+end
+
+@testset "tracked product set" begin
+    s1 = Set([1, 2, 3, 4])
+    s2 = Set(["a", "b", "c", "d"])
+    s3 = Set([0.1, 0.2, 0.3, 0.4])
+    tr = simulate(tracked_product_set, ([s1, s2, s3],))
+    @test get_retval(tr) == Set(Iterators.product(s1, s2, s3))
+
+    s1 = Set([1, 2, 3])
+    s2 = Set(["a", "b", "c", "d", "e"])
+    diff = VectorDiff(
+        3, 3, Dict(
+            1 => SetDiff(Set(), Set([4])),
+            2 => SetDiff(Set(["e"]), Set())
+        )
+    )
+    new_tr, _, retdiff, _ = update(tr, ([s1, s2, s3],), (diff,), EmptyAddressTree(), AllSelection())
+    @test retdiff isa SetDiff
+    @test retdiff.added == Set([(i, "e", j) for i=1:3, j=0.1:0.1:0.4])
+    @test retdiff.deleted == Set([(4, a, b) for a in ("a", "b", "c", "d"), b=0.1:0.1:0.4])
+    @test get_retval(new_tr) == Set(Iterators.product(s1, s2, s3))
 end

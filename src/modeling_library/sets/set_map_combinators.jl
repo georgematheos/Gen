@@ -159,7 +159,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, ::Tuple{<:D
     for (item, subtr) in tr.subtraces
         if !(item in set)
             ext_const = get_subtree(ext_const_addrs, item)
-            weight -= project(subtr, addrs(get_selected(get_choices(tr), ext_const)))
+            weight -= project(subtr, addrs(get_selected(get_choices(subtr), ext_const)))
             set_subtree!(discard, item, get_choices(subtr))
         end
     end
