@@ -134,12 +134,19 @@ end
     tr = simulate(tracked_union, (Dict(1 => s1, 2 => s2),))
     @test get_retval(tr) == Set([1, 2, 3, 4, "a", "b", "c", "d"])
 
+    tr2 = simulate(tracked_union, (s1, s2))
+    @test get_retval(tr) == get_retval(tr2)
+
     s1 = Set([1, 2, 3])
     diff = DictDiff(Dict{Int, Any}(), Set{Int}(), Dict(1 => SetDiff(Set(), Set([4]))))
     new_tr, _, retdiff, _ = update(tr, (Dict(1 => s1, 2 => s2),), (diff,), EmptyAddressTree())
     @test isempty(retdiff.added)
     @test retdiff.deleted == Set([4])
     @test get_retval(new_tr) == Set([1, 2, 3, "a", "b", "c", "d"])
+
+    new_tr2, _, retdiff2, _ = update(tr2, (s1, s2), (SetDiff(Set(), Set([4])),), EmptyAddressTree())
+    @test get_retval(new_tr2) == get_retval(new_tr)
+    @test retdiff2.added == retdiff.added && retdiff2.deleted == retdiff.deleted
 
     s2 = Set(["b", "c", "d", "e"])
     s3 = Set([.1,.2,.3,.4])

@@ -17,9 +17,16 @@ struct TrackedUnionState
 end
 struct TrackedUnion <: CustomUpdateGF{PersistentSet, TrackedUnionState} end
 tracked_union = TrackedUnion()
-function apply_with_state(::TrackedUnion, (subsets,))
+apply_with_state(t::TrackedUnion, subsets::Tuple{Vararg{<:AbstractSet}}) = apply_with_state(t, (Dict(enumerate(subsets)),))
+function apply_with_state(::TrackedUnion, (subsets,)::Tuple{<:Dict{<:Any, <:AbstractSet}})
     set = persistent_union(subsets)
     return (set, TrackedUnionState(set, subsets))
+end
+function update_with_state(t::TrackedUnion, st, subsets::Tuple{Vararg{<:AbstractSet}}, diffs::Tuple{Vararg{<:Diff}})
+    update_with_state(t, st,
+        (Dict(enumerate(subsets)),),
+        (DictDiff(Dict(), Set(), Dict(i => diff for (i, diff) in enumerate(diffs) if diff !== NoChange())),)
+    )
 end
 function update_with_state(::TrackedUnion, st, (subsets,), (subsets_diff,))
     (new_set, diff) = _update_tracked_union(st, subsets, subsets_diff)
