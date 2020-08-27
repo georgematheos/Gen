@@ -1,3 +1,8 @@
+#=
+TODO: there is probably a way to implement this using the `DictMapCombinator`
+and greatly reduce the amount of needed code.
+=#
+
 struct SetTrace{allows_collisions, ArgType, TraceType} <: Trace
     gen_fn::GenerativeFunction
     subtraces::PersistentHashMap{ArgType, TraceType}
@@ -51,8 +56,7 @@ function simulate(sm::SetMap{ac , <:Any, TraceType}, (set,)::Tuple{<:AbstractSet
     return SetTrace{ac, ArgType, TraceType}(sm, subtraces, (set,), score, noise)
 end
 
-function generate(sm::SetMap{ac, <:Any, TraceType}, args::Tuple{<:AbstractSet{ArgType}, Vararg}, constraints::ChoiceMap) where {ac, ArgType, TraceType}
-    set, shared_args = args[1], args[2:end]
+function generate(sm::SetMap{ac, <:Any, TraceType}, (set,)::Tuple{<:AbstractSet{ArgType}}, constraints::ChoiceMap) where {ac, ArgType, TraceType}
     subtraces = PersistentHashMap{ArgType, TraceType}()
     score = 0.
     weight = 0.
@@ -70,7 +74,7 @@ end
 
 function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tuple{<:Union{NoChange, <:SetDiff}}, spec::UpdateSpec, eca::Selection) where {ac, ArgType, TraceType}
     # If this is a leaf--so we can't count on `get_subtrees_shallow`--resort to our no-argdiff update.
-    if spec isa AddressTreeLeaf; update(tr, (set,), (UnknownChange(),), spec, eca); end
+    if spec isa AddressTreeLeaf && spec !== EmptyAddressTree(); update(tr, (set,), (UnknownChange(),), spec, eca); end
     
     subtraces = tr.subtraces
     weight = 0.
@@ -107,7 +111,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tu
             subtraces = dissoc(subtraces, removed_addr)
             score -= get_score(subtr)
             noise -= project(subtr, EmptyAddressTree())
-            weight -= project(subtr, addrs(get_selected(get_choices(subtr), eca)))
+            weight -= project(subtr, addrs(get_selected(get_choices(subtr), get_subtree(eca, removed_addr))))
             set_subtree!(discard, removed_addr, get_choices(subtr))
             if !ac
                 push!(deleted, get_retval(subtr))
@@ -150,9 +154,10 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, ::Tuple{<:D
             weight += wt
             set_subtree!(discard, item, this_discard)
         else
-            subtr, weight = generate(tr.gen_fn.kernel, (item,), get_subtree(spec, item))
+            subtr, wt = generate(tr.gen_fn.kernel, (item,), get_subtree(spec, item))
             score += get_score(subtr)
             noise += project(subtr, EmptyAddressTree())
+            weight += wt
             new_subtraces = assoc(new_subtraces, item, subtr)
         end
     end
@@ -160,6 +165,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, ::Tuple{<:D
         if !(item in set)
             ext_const = get_subtree(ext_const_addrs, item)
             weight -= project(subtr, addrs(get_selected(get_choices(subtr), ext_const)))
+            noise -= project(subtr, EmptyAddressTree())
             set_subtree!(discard, item, get_choices(subtr))
         end
     end

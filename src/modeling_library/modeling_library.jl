@@ -30,8 +30,9 @@ include("recurse/recurse.jl")
 
 include("custom_determ.jl")
 
-#####################
-# Set functionality #
-#####################
+##########################
+# Set/Dict functionality #
+##########################
 
 include("sets/sets.jl")
+include("dicts/dicts.jl")
