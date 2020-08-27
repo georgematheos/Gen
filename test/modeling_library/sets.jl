@@ -127,3 +127,28 @@ end
     @test retdiff.deleted == Set([(4, a, b) for a in ("a", "b", "c", "d"), b=0.1:0.1:0.4])
     @test get_retval(new_tr) == Set(Iterators.product(s1, s2, s3))
 end
+
+@testset "tracked union" begin
+    s1 = Set([1, 2, 3, 4])
+    s2 = Set(["a", "b", "c", "d"])
+    tr = simulate(tracked_union, (Dict(1 => s1, 2 => s2),))
+    @test get_retval(tr) == Set([1, 2, 3, 4, "a", "b", "c", "d"])
+
+    s1 = Set([1, 2, 3])
+    diff = DictDiff(Dict{Int, Any}(), Set{Int}(), Dict(1 => SetDiff(Set(), Set([4]))))
+    new_tr, _, retdiff, _ = update(tr, (Dict(1 => s1, 2 => s2),), (diff,), EmptyAddressTree())
+    @test isempty(retdiff.added)
+    @test retdiff.deleted == Set([4])
+    @test get_retval(new_tr) == Set([1, 2, 3, "a", "b", "c", "d"])
+
+    s2 = Set(["b", "c", "d", "e"])
+    s3 = Set([.1,.2,.3,.4])
+    diff = DictDiff(Dict([3 => s3]), Set{Int}(), Dict(
+        1 => SetDiff(Set(), Set([4])),
+        2 => SetDiff(Set(["e"]), Set(["a"]))
+    ))
+    new_tr, _, retdiff, _ = update(tr, (Dict(1 => s1, 2 => s2, 3 => s3),), (diff,), EmptyAddressTree())
+    @test retdiff.deleted == Set(["a", 4])
+    @test retdiff.added == Set([.1,.2,.3,.4,"e"])
+    @test get_retval(new_tr) == Set([1, 2, 3, "b", "c", "d", "e", .1, .2, .3, .4])
+end
