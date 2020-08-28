@@ -37,7 +37,7 @@ input dictionary.
 end
 ```
 """
-struct DictMap{KeyType, RetType, TraceType} <: Gen.GenerativeFunction{LazyValMapDict{KeyType, RetType}, DictTrace{<:KeyType, TraceType}}
+struct DictMap{KeyType, RetType, TraceType} <: Gen.GenerativeFunction{LazyValMapDict{KeyType, RetType}, DictTrace{<:KeyType, RetType, TraceType}}
     kernel::GenerativeFunction{RetType}
 end
 function DictMap(kernel::GenerativeFunction{RetType}) where {RetType}
@@ -46,7 +46,7 @@ end
 has_argument_grads(gf::DictMap) = has_argument_grads(gf.kernel)
 accepts_output_grad(gf::DictMap) = accepts_output_grad(gf.kernel)
 
-function simulate(dm::DictMap{KeyType, <:Any, TraceType}, (dict,)::Tuple{<:AbstractDict}) where {KeyType, TraceType}
+function simulate(dm::DictMap{KeyType, RetType, TraceType}, (dict,)::Tuple{<:AbstractDict}) where {KeyType, RetType, TraceType}
     subtraces = PersistentHashMap{KeyType, TraceType}()
     score = 0.
     noise = 0.
@@ -56,9 +56,9 @@ function simulate(dm::DictMap{KeyType, <:Any, TraceType}, (dict,)::Tuple{<:Abstr
         score += get_score(subtr)
         noise += project(subtr, EmptyAddressTree())
     end
-    return DictTrace(dm, subtraces, (dict,), score, noise)
+    return DictTrace{KeyType, RetType, TraceType}(dm, subtraces, (dict,), score, noise)
 end
-function generate(dm::DictMap{KeyType, <:Any, TraceType}, (dict,)::Tuple{<:AbstractDict}, constraints::ChoiceMap) where {KeyType, TraceType}
+function generate(dm::DictMap{KeyType, RetType, TraceType}, (dict,)::Tuple{<:AbstractDict}, constraints::ChoiceMap) where {KeyType, RetType, TraceType}
     subtraces = PersistentHashMap{KeyType, TraceType}()
     score = 0.
     noise = 0.
@@ -70,7 +70,7 @@ function generate(dm::DictMap{KeyType, <:Any, TraceType}, (dict,)::Tuple{<:Abstr
         noise += project(subtr, EmptyAddressTree())
         weight += wt
     end
-    return (DictTrace(dm, subtraces, (dict,), score, noise), weight)
+    return (DictTrace{KeyType, RetType, TraceType}(dm, subtraces, (dict,), score, noise), weight)
 end
 
 function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (diff,)::Tuple{<:Union{NoChange, <:DictDiff}}, spec::UpdateSpec, eca::Selection) where {KeyType, TraceType, RetType}
@@ -110,7 +110,7 @@ function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (dif
         subtraces = dissoc(subtraces, key)
         score -= get_score(subtr)
         noise -= project(subtr, EmptyAddressTree())
-        weight -= project(subtr, addrs(get_selected(get_choices(subtr), get_subtree(eca, key))))
+        weight -= project(subtr, get_subtree(eca, key))
         set_subtree!(discard, key, get_choices(subtr))
         push!(deleted, key)
     end
@@ -135,7 +135,7 @@ function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (dif
         end
     end
 
-    new_tr = DictTrace(tr.gen_fn, subtraces, (dict,), score, noise)
+    new_tr = DictTrace{KeyType, RetType, TraceType}(tr.gen_fn, subtraces, (dict,), score, noise)
     (new_tr, weight, DictDiff{KeyType, RetType}(added, deleted, updated), discard)
 end
 function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (diff,)::Tuple{<:Diff}, spec::UpdateSpec, eca::Selection) where {KeyType, TraceType, RetType}
@@ -178,6 +178,6 @@ function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (dif
             push!(deleted, key)
         end
     end
-    new_tr = DictTrace(tr.gen_fn, new_subtraces, (dict,), score, noise)
+    new_tr = DictTrace{KeyType, RetType, TraceType}(tr.gen_fn, new_subtraces, (dict,), score, noise)
     return (new_tr, weight, DictDiff{KeyType, RetType}(added, deleted, updated), discard)
 end

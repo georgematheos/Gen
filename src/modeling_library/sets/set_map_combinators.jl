@@ -130,11 +130,18 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tu
     end
 
     tr = SetTrace{ac, ArgType, TraceType}(tr.gen_fn, subtraces, (set,), score, noise)
-    retdiff = ac ? UnknownChange() : SetDiff(added, deleted)
+    if ac
+        retdiff = UnknownChange()
+    elseif isempty(added) && isempty(deleted)
+        retdiff = NoChange
+    else
+        retdiff = SetDiff(added, deleted)
+    end
+
     return (tr, weight, retdiff, discard)    
 end
 
-function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, ::Tuple{<:Diff}, spec::UpdateSpec, ext_const_addrs::Selection) where {ac, ArgType, TraceType}
+function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, argdiffs::Tuple{<:Diff}, spec::UpdateSpec, ext_const_addrs::Selection) where {ac, ArgType, TraceType}
     new_subtraces = PersistentHashMap{ArgType, TraceType}()
     discard = choicemap()
     weight = 0.
@@ -176,7 +183,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, ::Tuple{<:D
     else
         added = Set(item for item in get_retval(new_tr) if !(item in get_retval(tr)))
         deleted = Set(item for item in get_retval(tr) if !(item in get_retval(new_tr)))
-        retdiff = SetDiff(added, deleted)
+        retdiff = isempty(added) && isempty(deleted) ? NoChange() : SetDiff(added, deleted)
     end
 
     return (new_tr, weight, retdiff, discard)

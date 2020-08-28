@@ -1,4 +1,4 @@
-function persistent_union(subsets::Dict{<:Any, <:AbstractSet})
+function persistent_union(subsets::AbstractDict)
     set = PersistentSet()
     for (_, subset) in subsets
         for obj in subset
@@ -18,7 +18,7 @@ end
 struct TrackedUnion <: CustomUpdateGF{PersistentSet, TrackedUnionState} end
 tracked_union = TrackedUnion()
 apply_with_state(t::TrackedUnion, subsets::Tuple{Vararg{<:AbstractSet}}) = apply_with_state(t, (Dict(enumerate(subsets)),))
-function apply_with_state(::TrackedUnion, (subsets,)::Tuple{<:Dict{<:Any, <:AbstractSet}})
+function apply_with_state(::TrackedUnion, (subsets,)::Tuple{<:AbstractDict})
     set = persistent_union(subsets)
     return (set, TrackedUnionState(set, subsets))
 end
@@ -42,6 +42,16 @@ function _update_tracked_union(st, new_subsets, diff::DictDiff)
 
     set = handle_subset_additions_and_deletions!(set, old_subsets, diff, added, removed)
     set = handle_subset_changes!(set, old_subsets, new_subsets, diff, added, removed)
+
+    # we may have deleted an item from one subset, then added it to another subset.
+    # in this case, we don't want the item to appear as both added and removed,
+    # so we need to remove it from these collections
+    for item in added
+        if item in removed
+            delete!(added, item)
+            delete!(removed, item)
+        end
+    end
 
     return (set, SetDiff(added, removed))
 end

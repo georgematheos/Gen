@@ -44,6 +44,8 @@ function codegen_project(trace_type::Type, selection_type::Type)
     Expr(:block, stmts...)
 end
 
+@inline Gen.project(tr::StaticIRTrace, ::AllSelection) = get_score(tr)
+
 push!(generated_functions, quote
 
 @generated function $(GlobalRef(Gen, :project))(trace::T, selection::$(QuoteNode(Selection))) where {T <: $(QuoteNode(StaticIRTrace))}

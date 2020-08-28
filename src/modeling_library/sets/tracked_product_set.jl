@@ -45,9 +45,10 @@ function update_with_state(t::TrackedProductSet, st::TrackedProductSetState, (se
     for (i, diff) in sets_diff.updated
         product_set = _handle_additions(product_set, sets, i, diff, added)
     end
+
     return (TrackedProductSetState(product_set, sets), product_set, SetDiff(added, deleted))
 end
-function update_with_state(t::TrackedProductSet, ::TrackedProductSetState, (sets,), ::Tuple{<:Diff})
+function update_with_state(t::TrackedProductSet, ::TrackedProductSetState, (sets,), (diff,)::Tuple{<:Diff})
     (retval, st) = apply_with_state(t, (sets,))
     (st, retval, UnknownChange())
 end

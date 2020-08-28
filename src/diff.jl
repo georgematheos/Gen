@@ -52,26 +52,33 @@ struct SetDiff{V} <: Diff
     # elements that were deleted
     deleted::AbstractSet{<:V}
 
-    SetDiff(a, d) = new{Any}(a, d)
-    SetDiff{V}(a, d) where V = new{V}(a, d)
+    SetDiff(a, d) = isempty(a) && isempty(d) ? NoChange() : new{Any}(a, d)
+    SetDiff{V}(a, d) where V = isempty(a) && isempty(d) ? NoChange() : new{V}(a, d)
 end
 
 struct DictDiff{K,V} <: Diff
 
     # keys that that were added and their values
-    added::AbstractDict{K,V}
+    added::AbstractDict{<:K,V}
     
     # keys that were deleted
-    deleted::AbstractSet{K}
+    deleted::AbstractSet{<:K}
 
     # map from key to diff value for that key
-    updated::AbstractDict{K,Diff} 
+    updated::AbstractDict{<:K, <:Diff}
+
+    function DictDiff(a::AbstractDict{<:Any, V}, d, u) where {V}
+        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{Any, V}(a, d, u)
+    end
+    function DictDiff{K, V}(a, d, u) where {K, V}
+        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{K, V}(a, d, u)
+    end
 end
 
 struct VectorDiff <: Diff
     new_length::Int
     prev_length::Int
-    updated::Dict{Int,Diff} 
+    updated::Dict{Int,Diff}
 end
 
 struct IntDiff <: Diff
