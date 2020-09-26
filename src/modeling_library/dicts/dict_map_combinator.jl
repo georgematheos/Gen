@@ -123,6 +123,9 @@ function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (dif
         added[key] = get_retval(subtr)
     end
     for (key, df) in in_updated
+        if !haskey(subtraces, key)
+            error("No subtrace found for for key $key")
+        end
         old_subtr = subtraces[key]
         (new_subtr, wt, retdiff, dsc) = update(old_subtr, (dict[key],), (df,), get_subtree(spec, key), get_subtree(eca, key))
         weight += wt

@@ -3,9 +3,10 @@ TODO: there is probably a way to implement this using the `DictMapCombinator`
 and greatly reduce the amount of needed code.
 =#
 
-struct SetTrace{allows_collisions, ArgType, TraceType} <: Trace
+struct SetTrace{RetType, ArgType, TraceType} <: Trace
     gen_fn::GenerativeFunction
     subtraces::PersistentHashMap{ArgType, TraceType}
+    retval::RetType
     args::Tuple
     score::Float64
     noise::Float64
@@ -21,8 +22,7 @@ get_subtree(stcm::SetTraceChoiceMap, addr::Pair) = _get_subtree(stcm, addr)
 get_subtrees_shallow(stcm::SetTraceChoiceMap) = ((addr, get_choices(tr)) for (addr, tr) in stcm.tr.subtraces)
 
 get_choices(trace::SetTrace) = SetTraceChoiceMap(trace)
-get_retval(trace::SetTrace{true}) = set_map(((_, tr),) -> get_retval(tr), trace.subtraces)
-get_retval(trace::SetTrace{false}) = no_collision_set_map(((_, tr),) -> get_retval(tr), trace.subtraces)
+get_retval(trace::SetTrace) = trace.retval
 get_args(trace::SetTrace) = trace.args
 get_score(trace::SetTrace) = trace.score
 get_gen_fn(trace::SetTrace) = trace.gen_fn
@@ -30,20 +30,25 @@ project(trace::SetTrace, ::EmptyAddressTree) = trace.noise
 Base.getindex(tr::SetTrace, address) = tr.subtraces[address][]
 Base.getindex(tr::SetTrace, address::Pair) = tr.subtraces[address.first][address]
 
-struct SetMap{allows_collisions, SetRetType, TraceType} <: GenerativeFunction{SetRetType, SetTrace{allows_collisions, <:Any, TraceType}}
-    kernel::GenerativeFunction # we will have TraceType as specific as possible--but sometimes the gen function may not know the fully specific trace type
+struct SetMap{SetRetType, TraceType} <: GenerativeFunction{SetRetType, SetTrace{SetRetType, <:Any, TraceType}}
+    kernel::GenerativeFunction
 end
 function SetMap(kernel::GenerativeFunction{RetType, TraceType}) where {RetType, TraceType}
-    SetMap{true, MultiSet{RetType}, get_trace_type(kernel)}(kernel)
+    SetMap{MultiSet{<:RetType}, get_trace_type(kernel)}(kernel)
 end
 function NoCollisionSetMap(kernel::GenerativeFunction{RetType, TraceType}) where {RetType, TraceType}
-    SetMap{false, PersistentSet{RetType}, get_trace_type(kernel)}(kernel)
+    SetMap{PersistentSet{<:RetType}, get_trace_type(kernel)}(kernel)
 end
 has_argument_grads(gf::SetMap) = has_argument_grads(gf.kernel)
 accepts_output_grad(gf::SetMap) = accepts_output_grad(gf.kernel)
 
+function get_return_val(RetType, subtraces)
+    mapper = RetType <: MultiSet ? set_map : no_collision_set_map
+    mapper(((_, tr),) -> get_retval(tr), subtraces)
+end
+
 # SetMap(gen_fn)(set, shared_arg1, shared_arg2, ..., shared_argN)
-function simulate(sm::SetMap{ac , <:Any, TraceType}, (set,)::Tuple{<:AbstractSet{ArgType}}) where {ac, TraceType, ArgType}
+function simulate(sm::SetMap{RetType, TraceType}, (set,)::Tuple{<:AbstractSet{ArgType}}) where {RetType, TraceType, ArgType}
     subtraces = PersistentHashMap{ArgType, TraceType}()
     score = 0.
     noise = 0.
@@ -53,10 +58,11 @@ function simulate(sm::SetMap{ac , <:Any, TraceType}, (set,)::Tuple{<:AbstractSet
         score += get_score(subtr)
         noise += project(subtr, EmptyAddressTree())
     end
-    return SetTrace{ac, ArgType, TraceType}(sm, subtraces, (set,), score, noise)
+    retval = get_return_val(RetType, subtraces)
+    return SetTrace{RetType, ArgType, TraceType}(sm, subtraces, retval, (set,), score, noise)
 end
 
-function generate(sm::SetMap{ac, <:Any, TraceType}, (set,)::Tuple{<:AbstractSet{ArgType}}, constraints::ChoiceMap) where {ac, ArgType, TraceType}
+function generate(sm::SetMap{RetType, TraceType}, (set,)::Tuple{<:AbstractSet{ArgType}}, constraints::ChoiceMap) where {RetType, ArgType, TraceType}
     subtraces = PersistentHashMap{ArgType, TraceType}()
     score = 0.
     weight = 0.
@@ -69,10 +75,11 @@ function generate(sm::SetMap{ac, <:Any, TraceType}, (set,)::Tuple{<:AbstractSet{
         subtraces = assoc(subtraces, item, subtr)
         score += get_score(subtr)
     end
-    return (SetTrace{ac, ArgType, TraceType}(sm, subtraces, (set,), score, noise), weight)
+    retval = get_return_val(RetType, subtraces)
+    return (SetTrace{RetType, ArgType, TraceType}(sm, subtraces, retval, (set,), score, noise), weight)
 end
 
-function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tuple{<:Union{NoChange, <:SetDiff}}, spec::UpdateSpec, eca::Selection) where {ac, ArgType, TraceType}
+function update(tr::SetTrace{RetType, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tuple{<:Union{NoChange, <:SetDiff}}, spec::UpdateSpec, eca::Selection) where {RetType, ArgType, TraceType}
     # If this is a leaf--so we can't count on `get_subtrees_shallow`--resort to our no-argdiff update.
     if spec isa AddressTreeLeaf && spec !== EmptyAddressTree(); update(tr, (set,), (UnknownChange(),), spec, eca); end
     
@@ -81,7 +88,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tu
     score = tr.score
     noise = tr.noise
     discard = choicemap()
-    if !ac
+    if !(RetType <: MultiSet)
         added = Set()
         deleted = Set()
     end
@@ -95,7 +102,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tu
         score += get_score(new_subtr) - get_score(subtr)
         noise += project(new_subtr, EmptyAddressTree()) - project(subtr, EmptyAddressTree())
         set_subtree!(discard, addr, dsc)
-        if !ac && retdiff !== NoChange()
+        if !(RetType <: MultiSet) && retdiff !== NoChange()
             old = get_retval(subtr)
             new = get_retval(new_subtr)
             if old != new
@@ -113,7 +120,7 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tu
             noise -= project(subtr, EmptyAddressTree())
             weight -= project(subtr, addrs(get_selected(get_choices(subtr), get_subtree(eca, removed_addr))))
             set_subtree!(discard, removed_addr, get_choices(subtr))
-            if !ac
+            if !(RetType <: MultiSet)
                 push!(deleted, get_retval(subtr))
             end
         end
@@ -123,25 +130,35 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, (diff,)::Tu
             score += get_score(subtr)
             noise += project(subtr, EmptyAddressTree())
             subtraces = assoc(subtraces, new_addr, subtr)
-            if !ac
+            if !(RetType <: MultiSet)
                 push!(added, get_retval(subtr))
             end
         end
     end
 
-    tr = SetTrace{ac, ArgType, TraceType}(tr.gen_fn, subtraces, (set,), score, noise)
-    if ac
+    if RetType <: MultiSet
         retdiff = UnknownChange()
+        # TODO: this is a linear time operation!  can we do any better??
+        new_retval = get_return_val(RetType, subtraces)
     elseif isempty(added) && isempty(deleted)
-        retdiff = NoChange
+        retdiff = NoChange()
+        new_retval = get_retval(tr)
     else
         retdiff = SetDiff(added, deleted)
+        new_retval = get_retval(tr)
+        for item in deleted
+            new_retval = disj(new_retval, item)
+        end
+        for item in added
+            new_retval = push(new_retval, item)
+        end
     end
+    new_tr = SetTrace{RetType, ArgType, TraceType}(tr.gen_fn, subtraces, new_retval, (set,), score, noise)
 
-    return (tr, weight, retdiff, discard)    
+    return (new_tr, weight, retdiff, discard)    
 end
 
-function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, argdiffs::Tuple{<:Diff}, spec::UpdateSpec, ext_const_addrs::Selection) where {ac, ArgType, TraceType}
+function update(tr::SetTrace{RetType, ArgType, TraceType}, (set,)::Tuple, argdiffs::Tuple{<:Diff}, spec::UpdateSpec, ext_const_addrs::Selection) where {RetType, ArgType, TraceType}
     new_subtraces = PersistentHashMap{ArgType, TraceType}()
     discard = choicemap()
     weight = 0.
@@ -176,13 +193,14 @@ function update(tr::SetTrace{ac, ArgType, TraceType}, (set,)::Tuple, argdiffs::T
             set_subtree!(discard, item, get_choices(subtr))
         end
     end
-    new_tr = SetTrace{ac, ArgType, TraceType}(tr.gen_fn, new_subtraces, (set,), score, noise)
 
-    if ac
+    retval = get_return_val(RetType, new_subtraces)
+    new_tr = SetTrace{RetType, ArgType, TraceType}(tr.gen_fn, new_subtraces, retval, (set,), score, noise)
+    if RetType <: MultiSet
         retdiff = UnknownChange()
     else
-        added = Set(item for item in get_retval(new_tr) if !(item in get_retval(tr)))
-        deleted = Set(item for item in get_retval(tr) if !(item in get_retval(new_tr)))
+        added = Set(item for item in retval if !(item in get_retval(tr)))
+        deleted = Set(item for item in get_retval(tr) if !(item in retval))
         retdiff = isempty(added) && isempty(deleted) ? NoChange() : SetDiff(added, deleted)
     end
 

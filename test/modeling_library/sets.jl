@@ -94,6 +94,11 @@ end
     @test discard[priors[3]] == tr[priors[3]]
     @test isapprox(get_score(new_tr) - get_score(tr), weight)
 
+    new_tr2, weight2, retdiff2, discard2 = update(tr, (Set(priors[1:2]),), (UnknownChange(),), EmptyAddressTree(), AllSelection())
+    @test get_retval(new_tr2) == get_retval(new_tr)
+    @test isapprox(get_score(new_tr2), get_score(new_tr))
+    @test retdiff2 == retdiff
+    @test discard == discard2
 
     new_tr, weight, retdiff, discard = update(tr, (Set(priors[1:2]),), (SetDiff(Set(), Set([priors[3]])),), choicemap((priors[1], 1)), AllSelection())
     @test retdiff isa SetDiff

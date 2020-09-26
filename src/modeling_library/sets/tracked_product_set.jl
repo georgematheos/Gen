@@ -4,8 +4,10 @@ struct TrackedProductSetState
 end
 struct TrackedProductSet <: CustomUpdateGF{PersistentSet, TrackedProductSetState} end
 tracked_product_set = TrackedProductSet()
+_set_type(::AbstractSet{T}) where T = T
 function apply_with_state(::TrackedProductSet, (sets,))
-    tuples = PersistentSet()
+    types = map(_set_type, sets)
+    tuples = PersistentSet{Tuple{types...}}()
     for tup in Iterators.product(sets...) 
         tuples = push(tuples, tup)
     end
