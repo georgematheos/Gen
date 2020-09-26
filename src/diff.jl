@@ -55,6 +55,7 @@ struct SetDiff{V} <: Diff
     SetDiff(a, d) = isempty(a) && isempty(d) ? NoChange() : new{Any}(a, d)
     SetDiff{V}(a, d) where V = isempty(a) && isempty(d) ? NoChange() : new{V}(a, d)
 end
+Base.:(==)(sd1::SetDiff, sd2::SetDiff) = sd1.added == sd2.added && sd1.deleted == sd2.deleted
 
 struct DictDiff{K,V} <: Diff
 
