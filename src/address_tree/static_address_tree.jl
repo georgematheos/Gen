@@ -45,7 +45,7 @@ function addrs_subtrees_namedtuple(addrs_to_vals_and_trees)
 end
 
 @inline get_subtrees_shallow(t::StaticAddressTree) = pairs(t.subtrees)
-@inline get_submap(t::StaticAddressTree, addr::Pair) = _get_subtree(t, addr)
+@inline get_subtree(t::StaticAddressTree, addr::Pair) = _get_subtree(t, addr)
 
 function get_subtree(t::StaticAddressTree{LeafType, Addrs}, addr::Symbol) where {LeafType, Addrs}
     if addr in Addrs

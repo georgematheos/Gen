@@ -10,10 +10,13 @@ struct StaticInverseAddressSchema <: StaticSchema
     inv::StaticAddressSchema
 end
 struct InvertedKeys
-    keys
+    inv_static_schema
 end
-Base.in(key, ik::InvertedKeys) = !(Base.in(key, ik.keys))
-Base.keys(schema::StaticInverseAddressSchema) = InvertedKeys(keys(schema.inv))
+
+# TODO...I don't think having this always true breaks anything, but we can
+# make it more efficient
+Base.in(key, ik::InvertedKeys) = true #!(Base.in(key, ik.keys
+Base.keys(schema::StaticInverseAddressSchema) = InvertedKeys(schema.inv)
 
 struct EmptyAddressSchema <: StaticSchema end
 struct AllAddressSchema <: StaticSchema end

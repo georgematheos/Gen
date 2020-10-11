@@ -154,8 +154,10 @@ struct InvertedSelection{SelectionType} <: SelectionLeaf
     sel::SelectionType
     InvertedSelection(t::T) where {T <: Selection} = new{T}(t)
 end
+# TODO: should these all go through calls to `invert` rather than `InvertedSelection`?
 @inline InvertedSelection(::AllSelection) = EmptySelection()
 @inline InvertedSelection(::EmptySelection) = AllSelection()
+@inline InvertedSelection(i::InvertedSelection) = i.sel
 get_subtree(s::InvertedSelection, address) = InvertedSelection(get_subtree(s.sel, address))
 # get_subtrees_shallow uses default implementation for ::AddressTreeLeaf to return ()
 Base.isempty(::InvertedSelection) = false

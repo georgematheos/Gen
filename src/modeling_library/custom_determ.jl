@@ -23,6 +23,8 @@ get_choices(trace::CustomDetermGFTrace) = EmptyChoiceMap()
 get_score(trace::CustomDetermGFTrace) = 0.
 
 project(trace::CustomDetermGFTrace, selection::Selection) = 0.
+project(trace::CustomDetermGFTrace, ::AllSelection) = 0.
+project(trace::CustomDetermGFTrace, ::EmptySelection) = 0.
 
 get_gen_fn(trace::CustomDetermGFTrace) = trace.gen_fn
 

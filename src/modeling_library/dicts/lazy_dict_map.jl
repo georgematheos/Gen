@@ -40,7 +40,14 @@ Base.iterate(dict::LazySetToDictMap, st) = iterate(_iterator(dict), st)
 Return a dictionary of `key => f(key)` for each `key` in `keys`.
 Calls to `f` are performed lazily.
 """
-lazy_set_to_dict_map(f, keys) = LazySetToDictMap(f, keys)
+function lazy_set_to_dict_map(f, keys)
+    # if f isa Diffed && keys isa Diffed
+    #     println("yes, both are diffed!!!!")
+    # else
+    #     println(typeof(f), typeof(keys))
+    # end
+    LazySetToDictMap(f, keys)
+end
 function lazy_set_to_dict_map(f::Diffed{<:Function, NoChange}, keys::Diffed{<:Any, <:SetDiff})
     f = strip_diff(f)
     indiff = get_diff(keys)
@@ -50,6 +57,9 @@ function lazy_set_to_dict_map(f::Diffed{<:Function, NoChange}, keys::Diffed{<:An
         Dict{Any, Diff}()
     )
     Diffed(lazy_set_to_dict_map(f, strip_diff(keys)), outdiff)
+end
+function lazy_set_to_dict_map(f::Diffed, keys::Diffed)
+    Diffed(lazy_set_to_dict_map(strip_diff(f), strip_diff(keys)), UnknownChange())
 end
 
 

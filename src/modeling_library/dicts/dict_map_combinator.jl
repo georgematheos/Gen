@@ -20,7 +20,7 @@ get_args(trace::DictTrace) = trace.args
 get_score(trace::DictTrace) = trace.score
 project(trace::DictTrace, ::EmptyAddressTree) = trace.noise
 Base.getindex(tr::DictTrace, key) = tr.subtraces[key][]
-Base.getindex(tr::DictTrace, key::Pair) = tr.subtraces[key[2]][key[2]]
+Base.getindex(tr::DictTrace, key::Pair) = tr.subtraces[key[1]][key[2]]
 """
     DictMap(kernel)
 
@@ -169,13 +169,14 @@ function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (dif
             noise += project(subtr, EmptyAddressTree())
             weight += wt
             new_subtraces = assoc(new_subtraces, key, subtr)
-            push!(added, key, get_retval(subtr))
+            added[key] = get_retval(subtr)
         end
     end
     for (key, subtr) in tr.subtraces
-        if !haskey(tr.subtraces, key)
+        if !haskey(new_subtraces, key)
             ext_const = get_subtree(eca, key)
-            weight -= project(subtr, addrs(get_selected(get_choices(subtr), ext_const)))
+            s = project(subtr, ext_const) #addrs(get_selected(get_choices(subtr), ext_const)))
+            weight -= s
             noise -= project(subtr, EmptyAddressTree())
             set_subtree!(discard, key, get_choices(subtr))
             push!(deleted, key)
