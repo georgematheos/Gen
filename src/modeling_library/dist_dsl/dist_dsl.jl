@@ -5,18 +5,24 @@ include("relabeled_distribution.jl")
 
 #TODO: Remove Distribution{T} from structs; use a type U instead
 
-# `Arg` types: represent arguments to distributions
+# `Arg` types: represent arguments to distributions which are not constant values
 abstract type Arg{T} end
 
-# Represents a argument at a certain index
+# Represents a argument at a certain index in the dist DSL distribution signature
 struct SimpleArg{T} <: Arg{T}
     i :: Int8
 end
 
+# An argument obtained by transforming other arguments
 struct TransformedArg{T} <: Arg{T}
-    f_args :: Vector{Arg} # Is it better to do Union{TransformedArg, SimpleArg}?
+    f_args :: Vector{Arg} # The other `Arg`s transformed to get this argument
+    
+    # The function which transforms `f_args`, and some constants, into a value for this transformed arg
     orig_f :: Function
-    arg_passer :: Function
+    
+    # a function (f, f_args) -> value for this transformed arg.
+    # usually looks something like (f, f_args) -> f(f_args..., constant values...)
+    arg_passer :: Function 
 end
 
 # Each j is an Arg, and has a yes/no answer about whether
@@ -28,6 +34,7 @@ all_indices(arg::TransformedArg) = vcat([all_indices(a) for a in arg.f_args]...)
 # Evaluate user-facing args to concrete values passed to the base distribution
 eval_arg(x::Any, args) = x
 eval_arg(x::SimpleArg, args) = typecheck_arg(x, args[x.i])
+# TODO: the below can be asymptotically inefficient (https://github.com/probcomp/Gen.jl/issues/328)
 eval_arg(x::TransformedArg, args) =
     x.arg_passer(x.orig_f, [eval_arg(a, args) for a in x.f_args]...)
 
@@ -118,9 +125,9 @@ function dist_call(f, args, __module__)
         f(args...)
     elseif any(x -> (typeof(x) <: Arg), args)
         # Create a transformed argument
-        f_args = []
-        new_f_arg_names = []
-        actual_arg_exprs = []
+        f_args = [] # all the Arg arguments f is called on
+        new_f_arg_names = [] # gensym'd names for Arg arguments 
+        actual_arg_exprs = [] # all arguments, either gensym'd for Args, or the value expression
         for (i, x) in enumerate(args)
             if typeof(x) <: Arg
                 push!(f_args, x)
@@ -139,6 +146,69 @@ function dist_call(f, args, __module__)
     end
 end
 
+"""
+  handle_unpacking_statements!(unpack_stmts, symbolic_name, expr)
+
+Given a tuple-form variable declaration `expr`, which will be referred to
+with token `symbolic_name` in the program body, this function adds statements
+to the list `unpack_stmts` to unpack the variables as specified by `expr`.
+
+# Examples:
+  handle_unpacking_statements!(unpack_stmts, symbolic_name, :((a, (b, _))))
+  handle_unpacking_statements!(unpack_stmts, symbolic_name, :((_, (b, (c, (d, e), f)))))
+"""
+function handle_unpacking_statements!(unpack_stmts, symbolic_name, expr)
+  @assert (expr isa Expr && expr.head === :tuple) "Unrecognized argname expression in dist DSL: $expr"
+  for (i, subexpr) in enumerate(expr.args)
+    if subexpr isa Symbol # base case
+      if !all_underscore(subexpr)
+        push!(unpack_stmts, :($subexpr = getindex($symbolic_name, $i)))
+      end
+    else # recurse: we have to unpack the subexpression
+      name = gensym()
+      push!(unpack_stmts, :($name = getindex($symbolic_name, $i)))
+      handle_unpacking_statements!(unpack_stmts, name, subexpr)
+    end
+  end
+end
+
+# checks whether a variable name is an all-underscore identifier
+all_underscore(s) = s isa Symbol && all(c === '_' for c in String(s))
+
+"""
+  parse_args(arguments, __module__)
+
+Given the argument list to a dist DSL function, parses
+this list.  Returns `(name_to_index, name_to_type, unpack_stmts)`,
+where `name_to_index` and `name_to_type` map the token used for an argument
+to its position in the argument list and its declared type, and `unpack_stmts`
+is a list of expressions which, when executed, ``unpack'' arguments declared
+using unpacking syntax in the signature.  (This is for declarations like
+`@dist foo((a, b)) = ...`.)
+"""
+function parse_args(arguments, __module__)
+  name_to_index = Dict{Symbol, Int8}()
+  name_to_type = Dict{Symbol, Type}()
+  unpack_stmts = Expr[]
+  for (i, arg) in enumerate(arguments)
+    (argname, argtype, _, _) = splitarg(arg)
+    if argname === nothing || all_underscore(argname)
+      # in this case, the value can't be accessed from the distribution body,
+      # so we don't need to save information about it
+      continue
+    end
+    if argname isa Symbol
+      name = argname
+    else
+      name = gensym()
+      handle_unpacking_statements!(unpack_stmts, name, argname)
+    end
+      name_to_index[name] = i
+      name_to_type[name] = __module__.eval(argtype)
+  end
+
+  return (name_to_index, name_to_type, unpack_stmts)
+end
 
 #TODO: Make this actually compile a new type
 macro dist(fnexpr)
@@ -147,13 +217,8 @@ macro dist(fnexpr)
   arguments = fndef[:args]
   body = fndef[:body]
 
-  name_to_index = Dict{Symbol, Int8}()
-  name_to_type = Dict{Symbol, Type}()
-  for (i, arg) in enumerate(arguments)
-      (argname, argtype, _, _) = splitarg(arg)
-      name_to_index[argname] = i
-      name_to_type[argname] = __module__.eval(argtype)
-  end
+  name_to_index, name_to_type, unpack_stmts = parse_args(arguments, __module__)
+  body = Expr(:block, unpack_stmts..., body.args...)
 
   function process_node(node)
       if typeof(node) == Symbol && haskey(name_to_index, node)
@@ -166,6 +231,7 @@ macro dist(fnexpr)
   end
 
   dwa_expr = MacroTools.postwalk(process_node, body)
+
   :($(esc(fndef[:name])) =
     compile_dist_with_args($(esc(dwa_expr)), Int8($(length(arguments)))))
 end

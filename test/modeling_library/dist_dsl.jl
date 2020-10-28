@@ -27,6 +27,15 @@
   @dist real_minus_uniform(a, b) = 1 - Gen.uniform(a, b)
   @test real_minus_uniform(1, 2) < 0
   @test logpdf(real_minus_uniform, -0.5, 1, 2) == 0.0
+
+  # Test dist with unusual signatures
+  @dist tuple_minus_uniform((a, b)) = 1 - Gen.uniform(a, b)
+  @test tuple_minus_uniform((1, 2)) < 0
+  @test logpdf(tuple_minus_uniform, -0.5, (1, 2)) == 0.0
+
+  @dist normal_with_meanlingless_args((_,), (_, _), foo, (bar, baz)) = normal(0, 1)
+  @test normal_with_meanlingless_args((1), (1, 2), 4, (1, 2)) isa Real
+  @test logpdf(normal_with_meanlingless_args, 2.3, (1), (1, 2), 4, (1, 2)) == logpdf(normal, 2.3, 0, 1)
 end
 
 # User-defined type for testing purposes
@@ -55,6 +64,12 @@ end
   @test_throws MethodError mylabel_cat([:a, :b], [0., 1.])
   @test logpdf(mylabel_cat, MyLabel(:a), [MyLabel(:a)], [1.0]) == 0
   @test_throws MethodError logpdf(mylabel_cat, :a, [MyLabel(:a)], [1.0])
+
+  # Test dist with unusual signatures
+  @dist strangedist((_, (foo, bar))::Tuple{Int, Tuple{Int, Float64}}, baz, ::Int) = normal(bar, 1)
+  @test_throws MethodError strangedist((1, (1, "hi")), 1, 1)
+  @test strangedist((1, (1, 1.)), 1, 1) isa Real
+  @test logpdf(strangedist, 1.2, (1, (1, 1.)), 1, 1) == logpdf(normal, 1.2, 1, 1)
 end
 
 @testset "dist dsl as generative function" begin
