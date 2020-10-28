@@ -80,6 +80,22 @@ function parse_arg!(unpack_stmts, expr)
     end
 end
 
+function resolve_grad_arg(arg, __module__)
+    # Ensure that differentiable arguments are supported by ReverseDiff
+    if !(DSL_ARG_GRAD_ANNOTATION in arg.annotations) return arg end
+        typ = Core.eval(__module__, arg.typ)
+    if typ <: Real
+        new_typ = :Real
+    elseif typ <: AbstractArray{<:Real} && IndexStyle(typ) == IndexLinear()
+        new_typ = :(AbstractArray{<:Real})
+    elseif Real <: typ || AbstractArray{<:Real} <: typ
+        new_typ = arg.typ
+    else
+        error("Type of $(arg.name)::$(arg.typ) does not support differentiation.")
+    end
+    return Argument(arg.name, new_typ, arg.annotations, arg.default)
+end
+
 include("dynamic.jl")
 include("static.jl")
 
@@ -145,32 +161,25 @@ end
 
 function parse_gen_function(ast, annotations, __module__)
     ast = MacroTools.longdef(ast)
-    if ast.head != :function
-        error("syntax error at $ast in $(ast.head)")
-    end
-    if length(ast.args) != 2
-        error("syntax error at $ast in $(ast.args)")
-    end
-    signature = ast.args[1]
-    if signature.head == :(::)
-        (call_signature, return_type) = signature.args
-    elseif signature.head == :call
-        (call_signature, return_type) = (signature, :Any)
-    else
-        error("syntax error at $(signature)")
-    end
-    body = preprocess_body(ast.args[2], __module__)
-    name = call_signature.args[1]
+    def = MacroTools.splitdef(ast)
+    name = def[:name]
 
-    # unpack the args, and add any necessary statements to unpack arguments into the body
+    # unpack the args, and collect any necessary statements to unpack arguments into the body
     unpack_stmts = Expr[]
-    args = [parse_arg!(unpack_stmts, arg) for arg in call_signature.args[2:end]]
+    args = [parse_arg!(unpack_stmts, arg) for arg in def[:args]]
+    
+    body = preprocess_body(def[:body], __module__)
+
+    # add unpacking statements to the body
     body = Expr(:block, unpack_stmts..., body.args...)
+
+    return_type = get(def, :rtype, :Any)
 
     static = DSL_STATIC_ANNOTATION in annotations
     if static
         make_static_gen_function(name, args, body, return_type, annotations)
     else
+        args = map(a -> resolve_grad_arg(a, __module__), args)
         make_dynamic_gen_function(name, args, body, return_type, annotations)
     end
 end

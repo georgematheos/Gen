@@ -39,6 +39,7 @@ end
         return x + y + z + w + p
     end
 
+    @test_throws MethodError baz2((1, (2, (3, 4)), 5), 6, "hello")
     @test baz2((1, (2, (3, 4)), 5), 6., 7.) == 1+2+3+4+5
 end
 
