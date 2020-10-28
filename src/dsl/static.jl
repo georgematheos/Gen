@@ -163,8 +163,10 @@ function parse_assignment_line!(stmts, bindings, lhs, rhs)
         bindings[name] = node
         for (i, lhs_i) in enumerate(lhs.args)
             # Assign lhs[i] = rhs[i]
-            rhs_i = :($name[$i])
-            parse_assignment_line!(stmts, bindings, lhs_i, rhs_i)
+            if !all_underscore(lhs_i) # if we are assigning to an _, eg. `(a, _ ) = b`, skip the `_` assignment
+                rhs_i = :($name[$i])
+                parse_assignment_line!(stmts, bindings, lhs_i, rhs_i)
+            end
         end
     else
         # Handle single variable assignment (base case)
@@ -258,14 +260,21 @@ function make_static_gen_function(name, args, body, return_type, annotations)
     bindings = Dict{Symbol,Symbol}() # Map from variable names to node names
     # Generate statements that add nodes to the IR for each function argument
     for arg in args
-        if arg.default != nothing
+        if arg.default !== nothing
             error("Default argument values not supported in the static DSL.")
         end
-        node = gensym(arg.name)
+        if arg.name === nothing || all_underscore(arg.name)
+            # if the argname is unused, just generate a random symbol for it
+            # TODO: do we even need to add an argument node for this?
+            argname = gensym()
+        else
+            argname = arg.name
+        end
+        node = gensym(argname)
         push!(stmts, :($(esc(node)) = add_argument_node!(
-            builder, name=$(QuoteNode(arg.name)), typ=$(QuoteNode(arg.typ)),
+            builder, name=$(QuoteNode(argname)), typ=$(QuoteNode(arg.typ)),
             compute_grad=$(QuoteNode(DSL_ARG_GRAD_ANNOTATION in arg.annotations)))))
-        bindings[arg.name] = node
+        bindings[argname] = node
     end
     # Parse function body and add corresponding nodes to the IR
     parse_static_dsl_function_body!(stmts, bindings, body)
@@ -280,5 +289,6 @@ function make_static_gen_function(name, args, body, return_type, annotations)
     push!(stmts, :(Core.@__doc__ $(esc(name)) = $(esc(:eval))(
         generate_generative_function(ir, $(QuoteNode(name)), $(QuoteNode(options))))))
     # Return the block of statements, which will be evaluated at compile time
+
     Expr(:block, stmts...)
 end

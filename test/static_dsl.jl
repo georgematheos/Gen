@@ -490,6 +490,18 @@ tr, w = generate(foo, (params,), choicemap(:x => false, :y => 1))
 
 end
 
+@testset "unusual var declarations" begin 
+    @gen (static) function whackysig((x, (y, _))::Tuple{Int, Tuple{Float64, Any}}, z, ::String, _::Float64, _)
+        w = x + y + z
+        return w
+    end
+    load_generated_functions()
+
+    @test whackysig((1, (2., "hi")), 3, "hi", 2., true) == 1 + 2. + 3
+
+    # TODO: do we need to add tests for update, etc.?
+end
+
 @testset "use of 'end'" begin
 
 @gen (static) function foo()

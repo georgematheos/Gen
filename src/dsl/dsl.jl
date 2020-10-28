@@ -10,7 +10,7 @@ const DSL_NO_JULIA_CACHE_ANNOTATION = :nojuliacache
 const DSL_MACROS = Set([Symbol("@trace"), Symbol("@param")])
 
 struct Argument
-    name::Symbol
+    name::Union{Symbol, Nothing}
     typ::Union{Symbol,Expr}
     annotations::Set{Symbol}
     default::Union{Some{Any}, Nothing}
@@ -37,29 +37,47 @@ function parse_annotations(annotations_expr)
     annotations
 end
 
-function parse_arg(expr)
-    if isa(expr, Symbol)
-        # x
-        arg = Argument(expr, :Any)
-    elseif isa(expr, Expr) && expr.head == :(::)
-        # x::Int
-        arg = Argument(expr.args[1], expr.args[2])
-    elseif isa(expr, Expr) && expr.head == :kw
-        # x::Int=1
-        sub_arg = parse_arg(expr.args[1])
-        default = Some(expr.args[2])
-        arg = Argument(sub_arg.name, sub_arg.typ, Set{Symbol}(), default)
-    elseif isa(expr, Expr) && expr.head == :call
-        # (grad,foo)(x::Int)
+"""
+    handle_unpacking!(unpack_stmts, expr)
+
+Given an argument name declaration, if needed since the declaration
+is an unpacking-statement like `:((a, b))`, adds a statement to `unpack_stmts`
+to extract the needed variable names.  Returns the name used to refer
+to the overall variable.
+
+Eg. `handle_unpacking!(unpack_stmts, :(((a, b), c)))`
+will create a token `sym` and push `((a, b), c) = sym`
+into `unpack_stmts`.  `sym` will be returned.
+"""
+handle_unpacking!(_, argname::Symbol) = argname
+handle_unpacking!(_, ::Nothing) = nothing
+function handle_unpacking!(unpack_stmts, argname::Expr)
+    @assert (argname.head === :tuple) "Unrecognized argname construction in gen fn definition: $argname"
+    name = gensym(sprint(print, argname))
+    push!(unpack_stmts, :($argname = $name))
+    return name
+end
+
+"""
+    parse_arg!(unpack_stmts::Expr[], arg_expr)
+
+Parses the given argument expression, producing an `Argument`
+and possibly pushing statements into `unpack_stmts`
+to handle tuple-form variable declarations (like `:((a, b)::Tuple{Int, Float64})`).
+"""
+function parse_arg!(unpack_stmts, expr)
+    if isa(expr, Expr) && expr.head === :call
+        # annotated, like (grad,foo)(x::Int)
         annotations_expr = expr.args[1]
-        sub_arg = parse_arg(expr.args[2])
+        sub_arg = parse_arg!(unpack_stmts, expr.args[2])
         annotations = parse_annotations(annotations_expr)
-        arg = Argument(sub_arg.name, sub_arg.typ, annotations, sub_arg.default)
+        Argument(sub_arg.name, sub_arg.typ, annotations, sub_arg.default)
     else
-        dump(expr)
-        error("syntax error in gen function argument at $expr")
+        # non-annotated
+        (argname, argtype, _, default) = MacroTools.splitarg(expr)
+        name = handle_unpacking!(unpack_stmts, argname)
+        Argument(name, argtype, Set{Symbol}(), default === nothing ? nothing : Some(default))
     end
-    arg
 end
 
 include("dynamic.jl")
@@ -143,7 +161,12 @@ function parse_gen_function(ast, annotations, __module__)
     end
     body = preprocess_body(ast.args[2], __module__)
     name = call_signature.args[1]
-    args = map(parse_arg, call_signature.args[2:end])
+
+    # unpack the args, and add any necessary statements to unpack arguments into the body
+    unpack_stmts = Expr[]
+    args = [parse_arg!(unpack_stmts, arg) for arg in call_signature.args[2:end]]
+    body = Expr(:block, unpack_stmts..., body.args...)
+
     static = DSL_STATIC_ANNOTATION in annotations
     if static
         make_static_gen_function(name, args, body, return_type, annotations)

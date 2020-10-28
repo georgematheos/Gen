@@ -2,17 +2,22 @@ const DYNAMIC_DSL_TRACE = Symbol("@trace")
 
 "Convert Argument structs to ASTs."
 function arg_to_ast(arg::Argument)
-    ast = esc(arg.name)
-    if (arg.default != nothing)
+    if arg.name !== nothing
+        ast = :($(esc(arg.name)))
+    else
+        ast = :_
+    end
+    if (arg.default !== nothing)
         default = something(arg.default)
         ast = Expr(:kw, ast, esc(default))
     end
+
     ast
 end
 
 "Escape argument defaults (if present)."
 function escape_default(arg)
-    (arg.default == nothing ? nothing :
+    (arg.default === nothing ? nothing :
         Expr(:call, :Some, esc(something(arg.default))))
 end
 

@@ -25,9 +25,21 @@ end
 
     @test baz(5) == 5
 
-    @gen (grad) oneliner(x::Float64, (grad)(y::Float64=5)) = x+y
+    @gen (grad) oneliner(x::Float64, (grad)(y::Float64=5.)) = x+y
 
-    @test oneliner(5) == 10
+    @test oneliner(5.) == 10
+
+    @gen function baz((x, y)::Tuple{Int, Float64}, z)
+        return x + y + z
+    end
+    @test_throws MethodError baz(("hi", 1), 1)
+    @test baz((1, 2.), 3) == 6
+
+    @gen function baz2((x, (y, (z, w)), p), _, ::Float64)
+        return x + y + z + w + p
+    end
+
+    @test baz2((1, (2, (3, 4)), 5), 6., 7.) == 1+2+3+4+5
 end
 
 @testset "return type" begin
