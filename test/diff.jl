@@ -92,9 +92,18 @@ end
 end
 
 @testset "diff dictionaries" begin
+    println("TODO: write tests for dict diffs")
+    added = Dict(1 => 1, 2 => 2)
+    deleted = Set([3])
+    updated = Dict(6 => UnknownChange())
+    # TODO: this fails if I say `isa DictDiff{Int, Int}`
+    @test DictDiff(added, deleted, updated) isa DictDiff
 end
 
 @testset "diff sets" begin
+    println("TODO: write tests for set diffs")
+    # TODO: this fails if I say `isa SetDiff{Int}`
+    @test SetDiff(Set([1, 2]), Set([3])) isa SetDiff
 end
 
 @testset "diff properties" begin

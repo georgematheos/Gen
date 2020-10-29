@@ -45,42 +45,42 @@ The value did not change.
 """
 struct NoChange <: Diff end
 
-struct SetDiff{V} <: Diff
+struct SetDiff{V, A, D} <: Diff
     # elements that were added
-    added::AbstractSet{<:V}
+    added::A
 
     # elements that were deleted
-    deleted::AbstractSet{<:V}
+    deleted::D
 
-    SetDiff(a, d) = isempty(a) && isempty(d) ? NoChange() : new{Any}(a, d)
-    SetDiff{V}(a, d) where V = isempty(a) && isempty(d) ? NoChange() : new{V}(a, d)
+    SetDiff(a::A, d::D) where {A, D} = isempty(a) && isempty(d) ? NoChange() : new{Any, A, D}(a, d)
+    SetDiff{V}(a::A, d::D) where {V, A <: AbstractSet{V}, D <: AbstractSet{V}} = isempty(a) && isempty(d) ? NoChange() : new{V, A, D}(a, d)
 end
 Base.:(==)(sd1::SetDiff, sd2::SetDiff) = sd1.added == sd2.added && sd1.deleted == sd2.deleted
 
-struct DictDiff{K,V} <: Diff
-
-    # keys that that were added and their values
-    added::AbstractDict{<:K,V}
-    
-    # keys that were deleted
-    deleted::AbstractSet{<:K}
-
-    # map from key to diff value for that key
-    updated::AbstractDict{<:K, <:Diff}
-
-    function DictDiff(a::AbstractDict{<:Any, V}, d, u) where {V}
-        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{Any, V}(a, d, u)
+struct DictDiff{K, V, A, D, U} <: Diff
+    added::A # keys that that were added and their values
+    deleted::D # keys that were deleted
+    updated::U # map from key to diff value for that key
+    function DictDiff(a::A, d::D, u::U) where {V,
+        A <: AbstractDict{<:Any, V}, D <: AbstractSet{<:Any}, U <: AbstractDict{<:Any, <:Diff}
+    }
+        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{Any, V, A, D, U}(a, d, u)
     end
-    function DictDiff{K, V}(a, d, u) where {K, V}
-        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{K, V}(a, d, u)
+    function DictDiff{K, V}(a::A, d::D, u::U) where {K, V,
+        A <: AbstractDict{K, V}, D <: AbstractSet{K}, U <: AbstractDict{K, <:Diff}
+    }
+        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{K, V, A, D, U}(a, d, u)
     end
 end
 
-struct VectorDiff <: Diff
+struct VectorDiff{DictType} <: Diff
     new_length::Int
     prev_length::Int
-    updated::Dict{Int,Diff}
+    updated::DictType
+    VectorDiff(n, p, d::DictType) where {DictType <: AbstractDict{Int,Diff}} = new{DictType}(n, p, d)
+    VectorDiff(n, p, d::Dict{Int, Diff}) = new{Dict{Int, Diff}}(n, p, d)
 end
+VectorDiff(n, p, d::Dict) = VectorDiff(n, p, convert(Dict{Int, Diff}, d))
 
 struct IntDiff <: Diff
     difference::Int # new - old
