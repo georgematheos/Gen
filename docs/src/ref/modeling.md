@@ -44,16 +44,12 @@ Annotations are a syntactic construct in the built-in modeling language that all
 Annotations are optional, and not necessary to understand the basics of Gen.
 There are two types of annotations -- *argument annotations* and *function annotations*.
 
-**Argument annotations.** In addition to type declarations on arguments like regular Julia functions, `@gen` functions also support additional annotations on arguments.
-Each argument can have the following different syntactic forms:
+**Argument annotations.** In addition to type declarations on arguments like regular Julia functions, `@gen` functions also support additional annotations on arguments.  Annotations are added to arguments in parentheticals
+preceding the name.  Examples include:
 
-- `y`: No type declaration; no annotations.
+- `(grad)(y)`
 
-- `y::Float64`: Type declaration; but no annotations.
-
-- `(grad)(y)`: No type declaration provided;, annotated with `grad`.
-
-- `(grad)(y::Float64)`: Type declaration provided; and annotated with `grad`.
+- `(grad)(y::Float64)`
 
 Currently, the possible argument annotations are:
 
