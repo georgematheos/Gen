@@ -30,9 +30,9 @@ include("recurse/recurse.jl")
 
 include("custom_determ.jl")
 
-##########################
-# Set/Dict functionality #
-##########################
+### lazy maps ###
+include("lazy_maps.jl")
 
+### sets/dicts ###
 include("sets/sets.jl")
-include("dicts/dicts.jl")
+include("dict_map_combinator.jl")

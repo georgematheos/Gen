@@ -185,3 +185,5 @@ function update(tr::DictTrace{KeyType, RetType, TraceType}, (dict,)::Tuple, (dif
     new_tr = DictTrace{KeyType, RetType, TraceType}(tr.gen_fn, new_subtraces, (dict,), score, noise)
     return (new_tr, weight, DictDiff{KeyType, RetType}(added, deleted, updated), discard)
 end
+
+export DictMap
