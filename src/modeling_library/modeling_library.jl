@@ -11,6 +11,9 @@ include("distributions/distributions.jl")
 # @dist DSL
 include("dist_dsl/dist_dsl.jl")
 
+### lazy maps ###
+include("lazy_maps.jl")
+
 ###############
 # combinators #
 ###############
@@ -23,6 +26,8 @@ include("call_at/call_at.jl")
 include("map/map.jl")
 include("unfold/unfold.jl")
 include("recurse/recurse.jl")
+include("switch.jl")
+include("dict_map_combinator.jl")
 
 #############################################################
 # abstractions for constructing custom generative functions #
@@ -30,9 +35,5 @@ include("recurse/recurse.jl")
 
 include("custom_determ.jl")
 
-### lazy maps ###
-include("lazy_maps.jl")
-
-### sets/dicts ###
+### sets functionality (and setmap combinator) ###
 include("sets/sets.jl")
-include("dict_map_combinator.jl")
