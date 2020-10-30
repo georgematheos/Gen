@@ -15,6 +15,7 @@ get_subtree(dtcm::DictTraceChoiceMap, addr::Pair) = _get_subtree(dtcm, addr)
 get_subtrees_shallow(dtcm::DictTraceChoiceMap) = ((key, get_choices(tr)) for (key, tr) in dtcm.tr.subtraces)
 
 get_choices(trace::DictTrace) = DictTraceChoiceMap(trace)
+get_gen_fn(trace::DictTrace) = trace.gen_fn
 get_retval(trace::DictTrace) = lazy_val_map(get_retval, trace.subtraces)
 get_args(trace::DictTrace) = trace.args
 get_score(trace::DictTrace) = trace.score
