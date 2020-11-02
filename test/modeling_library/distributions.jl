@@ -1,7 +1,6 @@
 import DataStructures: OrderedDict
 
 @testset "bernoulli" begin
-
     # random
     x = bernoulli(0.5)
 
@@ -12,6 +11,20 @@ import DataStructures: OrderedDict
     @test isapprox(actual[2], finite_diff(f, args, 2, dx))
     args = (true, 0.3,)
     actual = logpdf_grad(bernoulli, args...)
+    @test isapprox(actual[2], finite_diff(f, args, 2, dx))
+end
+
+@testset "int bernoulli" begin
+    # random
+    x = int_bernoulli(0.5)
+
+    # logpdf_grad
+    f = (x::Integer, prob::Float64) -> logpdf(int_bernoulli, x, prob)
+    args = (0, 0.3,)
+    actual = logpdf_grad(int_bernoulli, args...)
+    @test isapprox(actual[2], finite_diff(f, args, 2, dx))
+    args = (1, 0.3,)
+    actual = logpdf_grad(int_bernoulli, args...)
     @test isapprox(actual[2], finite_diff(f, args, 2, dx))
 end
 
