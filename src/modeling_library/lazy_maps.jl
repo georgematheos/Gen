@@ -1,13 +1,14 @@
 ### lazy_val_map ###
-struct LazyValMapDict{K, V} <: AbstractDict{K, V}
+struct LazyValMapDict <: AbstractDict{Any, Any}
     f::Function
-    keys_to_vals::AbstractDict{K, V}
+    keys_to_vals
 end
-Base.getindex(dict::LazyValMapDict{K}, key::K) where {K} = dict.f(dict.keys_to_vals[key])
-function Base.get(dict::LazyValMapDict{K}, key::K, v) where {K}
+
+Base.getindex(dict::LazyValMapDict, key) = dict.f(dict.keys_to_vals[key])
+function Base.get(dict::LazyValMapDict, key, v)
     haskey(dict, key) ? dict[key] : v
 end
-Base.haskey(dict::LazyValMapDict{K}, key::K) where {K} = haskey(dict.keys_to_vals, key)
+Base.haskey(dict::LazyValMapDict, key) = haskey(dict.keys_to_vals, key)
 Base.length(dict::LazyValMapDict) = length(dict.keys_to_vals)
 
 _iterator(dict::LazyValMapDict) = (key => dict.f(val) for (key, val) in dict.keys_to_vals)
@@ -76,49 +77,66 @@ function lazy_set_to_dict_map(f::Diffed, keys::Diffed)
     Diffed(lazy_set_to_dict_map(strip_diff(f), strip_diff(keys)), UnknownChange())
 end
 
-### lazy_no_collision_set_map ###
-struct LazyNoCollisionSetMap{K} <: AbstractSet{Any}
+### lazy_bijection_set_map ###
+struct LazyBijectionSetMap{K} <: AbstractSet{Any}
     f::Function
+    f_inv::Function
     keys::AbstractSet{K}
 end
-Base.in(set::LazyNoCollisionSetMap{K}, v) where K = set.f(v) in set.keys
-Base.length(set::LazyNoCollisionSetMap) = length(set.keys)
+Base.in(set::LazyBijectionSetMap{K}, v) where K = f_inv(v) in set.keys
+Base.length(set::LazyBijectionSetMap) = length(set.keys)
 
-_iterator(set::LazyNoCollisionSetMap) = (set.f(item) for item in dict.keys)
-Base.iterate(set::LazyNoCollisionSetMap) = iterate(_iterator(set))
-Base.iterate(set::LazyNoCollisionSetMap, st) = iterate(_iterator(set), st)
+function _iterator(set::LazyBijectionSetMap)
+    try
+        collect((set.f(item) for item in set.keys))
+    catch e
+        println("caught error! keys are:")
+        display(set.keys)
+        println("f(firstkey) is ", set.f(first(set.keys)))
+        throw(e)
+    end
+    (set.f(item) for item in set.keys)
+end
+Base.iterate(set::LazyBijectionSetMap) = iterate(_iterator(set))
+Base.iterate(set::LazyBijectionSetMap, st) = iterate(_iterator(set), st)
 
 """
-    lazy_no_collision_set_map(f, keys)
+    lazy_bijection_set_map(f, keys)
 
-Return a set of elements `f(key)` for each key in keys.
-Calls to `f` are performed lazily.
+Return a set of elements `f(key)` for each key in keys,
+where `f` is a bijection with inverse `f_inv`.
+Calls to `f` and `f_inv` are performed lazily.
 """
-lazy_no_collision_set_map(f, keys) = LazyNoCollisionSetMap(f, keys)
-function lazy_no_collision_set_map(f::Diffed{<:Function, NoChange}, keys::Diffed{<:Any, <:SetDiff})
+lazy_bijection_set_map(f, f_inv, keys) = LazyBijectionSetMap(f, f_inv, keys)
+function lazy_bijection_set_map(f::Diffed{<:Function, NoChange}, f_inv::Diffed{<:Function, NoChange}, keys::Diffed{<:Any, <:SetDiff})
     f = strip_diff(f)
+    f_inv = strip_diff(f_inv)
     indiff = get_diff(keys)
     outdiff = SetDiff(
-        lazy_no_collision_set_map(f, indiff.added),
-        lazy_no_collision_set_map(f, indiff.deleted)
+        lazy_bijection_set_map(f, f_inv, indiff.added),
+        lazy_bijection_set_map(f, f_inv, indiff.deleted)
     )
-    Diffed(lazy_no_collision_set_map(f, strip_diff(keys)), outdiff)
+    Diffed(lazy_bijection_set_map(f, f_inv, strip_diff(keys)), outdiff)
 end
-function lazy_no_collision_set_map(f::Diffed{<:Function, NoChange}, keys::Diffed{<:Any, NoChange})
-    Diffed(lazy_no_collision_set_map(strip_diff(f), strip_diff(keys)), NoChange())
+function lazy_bijection_set_map(f::Diffed{<:Function, NoChange}, f_inv::Diffed{<:Function, NoChange}, keys::Diffed{<:Any, NoChange})
+    Diffed(lazy_bijection_set_map(strip_diff(f), strip_diff(f_inv), strip_diff(keys)), NoChange())
 end
-function lazy_no_collision_set_map(f::Diffed, keys::Diffed)
-    Diffed(lazy_no_collision_set_map(strip_diff(f), strip_diff(keys)), UnknownChange())
+function lazy_bijection_set_map(f::Diffed, f_inv::Diffed, keys::Diffed)
+    Diffed(lazy_bijection_set_map(strip_diff(f), strip_diff(f_inv), strip_diff(keys)), UnknownChange())
 end
-
-### TODO: lazy_set_map ###
 
 ### lazy_map ###
-struct LazyMap{K} <: AbstractVector{Any}
+struct LazyMap{InType} <: AbstractVector{Any}
     f::Function
-    in::AbstractVector{K}
+    in::InType
+    function LazyMap(f::Function, in::T) where {
+        T <: Union{Tuple, AbstractVector}
+    }
+        new{T}(f, in)
+    end
 end
-Base.size(l::LazyMap) = size(l.in)
+Base.size(l::LazyMap{<:AbstractVector}) = size(l.in)
+Base.size(l::LazyMap{<:Tuple}) = (length(l.in),)
 Base.getindex(l::LazyMap, i) = l.f(getindex(l.in, i))
 
 """
@@ -139,4 +157,4 @@ end
 lazy_map(f::Diffed{<:Function, NoChange}, in::Diffed{<:Any, NoChange}) = Diffed(lazy_map(strip_diff(f), strip_diff(in)), NoChange())
 lazy_map(f::Diffed{<:Function, <:Any}, in::Diffed{<:Any, <:Any}) = Diffed(lazy_map(strip_diff(f), strip_diff(in)), UnknownChange())
 
-export lazy_val_map, lazy_set_to_dict_map, lazy_no_collision_set_map, lazy_map
+export lazy_val_map, lazy_set_to_dict_map, lazy_bijection_set_map, lazy_map

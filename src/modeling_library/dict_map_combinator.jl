@@ -38,7 +38,7 @@ input dictionary.
 end
 ```
 """
-struct DictMap{KeyType, RetType, TraceType} <: Gen.GenerativeFunction{LazyValMapDict{KeyType, RetType}, DictTrace{<:KeyType, RetType, TraceType}}
+struct DictMap{KeyType, RetType, TraceType} <: Gen.GenerativeFunction{LazyValMapDict, DictTrace{<:KeyType, RetType, TraceType}}
     kernel::GenerativeFunction{RetType}
 end
 function DictMap(kernel::GenerativeFunction{RetType}) where {RetType}
