@@ -121,3 +121,11 @@ end
 
     # TODO: test propagating VectorDiffs
 end
+
+@testset "colon diff" begin
+    @test 1:Diffed(2, NoChange()) == Diffed(1:2, NoChange())
+    @test 1:Diffed(2, UnknownChange()) == Diffed(1:2, UnknownChange())
+    @test Diffed(1, NoChange()):2 == Diffed(1:2, NoChange())
+    @test Diffed(1, NoChange()):Diffed(2, UnknownChange()) == Diffed(1:2, UnknownChange())
+    @test Diffed(1, NoChange()):Diffed(2, NoChange()) == Diffed(1:2, NoChange())
+end

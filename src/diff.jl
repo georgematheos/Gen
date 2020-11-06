@@ -246,7 +246,7 @@ function Base.length(vec::Diffed{T,NoChange}) where {T <: Union{AbstractVector,T
     Diffed(result, NoChange())
 end
 
-function Base.length(vec::Diffed{T,VectorDiff}) where {T <: Union{AbstractVector,Tuple}}
+function Base.length(vec::Diffed{T,<:VectorDiff}) where {T <: Union{AbstractVector,Tuple}}
     len = length(strip_diff(vec))
     len_diff = get_diff(vec).new_length - get_diff(vec).prev_length
     if len_diff == 0
@@ -288,7 +288,7 @@ function Base.getindex(vec::Diffed{T,NoChange}, idx::Union{Diffed{U,NoChange},In
     Diffed(result, NoChange())
 end
 
-function Base.getindex(vec::Diffed{T,VectorDiff}, idx::Union{Diffed{U,NoChange},Integer}) where {T <: Union{AbstractVector,Tuple}, U <: Integer}
+function Base.getindex(vec::Diffed{T,<:VectorDiff}, idx::Union{Diffed{U,NoChange},Integer}) where {T <: Union{AbstractVector,Tuple}, U <: Integer}
     v = strip_diff(vec)
     i = strip_diff(idx)
     d = get_diff(vec)
@@ -459,3 +459,11 @@ function ifelse(c::Bool, x, y)
 end
 
 export ifelse
+
+### colon ###
+function Base.:(:)(first::Diffed{<:Integer}, last::Diffed{<:Integer})
+    is_no_change = get_diff(first) === NoChange() && get_diff(last) === NoChange()
+    Diffed(strip_diff(first):strip_diff(last), is_no_change ? NoChange() : UnknownChange())
+end
+Base.:(:)(first::Integer, last::Diffed{<:Integer}) = Diffed(first, NoChange()):last
+Base.:(:)(first::Diffed{<:Integer}, last::Integer) = first:Diffed(last, NoChange())
