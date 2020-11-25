@@ -64,12 +64,12 @@ struct DictDiff{K, V, A, D, U} <: Diff
     function DictDiff(a::A, d::D, u::U) where {V,
         A <: AbstractDict{<:Any, V}, D <: AbstractSet{<:Any}, U <: AbstractDict{<:Any, <:Diff}
     }
-        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{Any, V, A, D, U}(a, d, u)
+        new{Any, V, A, D, U}(a, d, u)
     end
     function DictDiff{K, V}(a::A, d::D, u::U) where {K, V,
         A <: AbstractDict{K, V}, D <: AbstractSet{K}, U <: AbstractDict{K, <:Diff}
     }
-        isempty(a) && isempty(d) && isempty(u) ? NoChange() : new{K, V, A, D, U}(a, d, u)
+        new{K, V, A, D, U}(a, d, u)
     end
 end
 
