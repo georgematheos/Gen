@@ -60,6 +60,7 @@ Return a dictionary of `key => f(key)` for each `key` in `keys`.
 Calls to `f` are performed lazily.
 """
 lazy_set_to_dict_map(f, keys) = LazySetToDictMap(f, keys)
+lazy_set_to_dict_map(f::Function, keys::Diffed) = lazy_set_to_dict_map(Diffed(f, NoChange()), keys)
 function lazy_set_to_dict_map(f::Diffed{<:Function, NoChange}, keys::Diffed{<:Any, <:SetDiff})
     f = strip_diff(f)
     indiff = get_diff(keys)
@@ -83,7 +84,7 @@ struct LazyBijectionSetMap{K} <: AbstractSet{Any}
     f_inv::Function
     keys::AbstractSet{K}
 end
-Base.in(set::LazyBijectionSetMap{K}, v) where K = f_inv(v) in set.keys
+Base.in(v, set::LazyBijectionSetMap) = set.f_inv(v) in set.keys
 Base.length(set::LazyBijectionSetMap) = length(set.keys)
 
 function _iterator(set::LazyBijectionSetMap)
