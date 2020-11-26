@@ -52,8 +52,8 @@ struct SetDiff{V, A, D} <: Diff
     # elements that were deleted
     deleted::D
 
-    SetDiff(a::A, d::D) where {A, D} = isempty(a) && isempty(d) ? NoChange() : new{Any, A, D}(a, d)
-    SetDiff{V}(a::A, d::D) where {V, A <: AbstractSet{V}, D <: AbstractSet{V}} = isempty(a) && isempty(d) ? NoChange() : new{V, A, D}(a, d)
+    SetDiff(a::A, d::D) where {A, D} = new{Any, A, D}(a, d)
+    SetDiff{V}(a::A, d::D) where {V, A <: AbstractSet{V}, D <: AbstractSet{V}} = new{V, A, D}(a, d)
 end
 Base.:(==)(sd1::SetDiff, sd2::SetDiff) = sd1.added == sd2.added && sd1.deleted == sd2.deleted
 
