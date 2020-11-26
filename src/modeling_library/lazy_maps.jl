@@ -1,8 +1,23 @@
 ### lazy_val_map ###
-struct LazyValMapDict <: AbstractDict{Any, Any}
+struct LazyValMapDict{K, V} <: AbstractDict{K, V}
     f::Function
     keys_to_vals
 end
+function LazyValMapDict(f, keys_to_vals::AbstractDict{K, V}) where {K, V}
+    # println()
+    # println("for $V, stacktrace is: ")
+    # display(stacktrace())
+    valtype = Core.Compiler.return_type(f, Tuple{V})
+    LazyValMapDict{K, valtype}(f, keys_to_vals)
+end
+function LazyValMapDict(f, keys_to_vals::Vector{V}) where {V}
+    valtype = Core.Compiler.return_type(f, Tuple{V})
+    LazyValMapDict{K, valtype}(f, keys_to_vals)
+    LazyValMapDict{Int, valtype}(f, keys_to_vals)
+end
+# function Base.convert(::Type{LazyValMapDict{K, V}}, lvm::LazyValMapDict{K_old, V_old}) where {K, V, K_old, V_old}
+#     @assert V_old <: V
+#     LazyValMapDict{K, V}(lvm.f, )
 
 Base.getindex(dict::LazyValMapDict, key) = dict.f(dict.keys_to_vals[key])
 function Base.get(dict::LazyValMapDict, key, v)
@@ -40,9 +55,13 @@ function lazy_val_map(f::Diffed{<:Function, NoChange}, dict::Diffed{<:Any, NoCha
 end
 
 ### lazy_set_to_dict_map ###
-struct LazySetToDictMap{K} <: AbstractDict{K, Any}
+struct LazySetToDictMap{K, V} <: AbstractDict{K, V}
     f::Function
     keys::AbstractSet{K}
+end
+function LazySetToDictMap(f, keys::AbstractSet{K}) where {K}
+    vtype = Core.Compiler.return_type(f, Tuple{K})
+    LazySetToDictMap{K, vtype}(f, keys)
 end
 Base.getindex(dict::LazySetToDictMap{K}, key::K) where K = dict.f(key)
 Base.get(dict::LazySetToDictMap{K}, key::K, v) where K = haskey(dict.keys, key) ? dict.f(key) : v
@@ -79,10 +98,14 @@ function lazy_set_to_dict_map(f::Diffed, keys::Diffed)
 end
 
 ### lazy_bijection_set_map ###
-struct LazyBijectionSetMap{K} <: AbstractSet{Any}
+struct LazyBijectionSetMap{K, V} <: AbstractSet{V}
     f::Function
     f_inv::Function
     keys::AbstractSet{K}
+end
+function LazyBijectionSetMap(f, f_inv, keys::AbstractSet{K}) where {K}
+    V = Core.Compiler.return_type(f, Tuple{K})
+    LazyBijectionSetMap{K, V}(f, f_inv, keys)
 end
 Base.in(v, set::LazyBijectionSetMap) = set.f_inv(v) in set.keys
 Base.length(set::LazyBijectionSetMap) = length(set.keys)

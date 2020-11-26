@@ -114,6 +114,10 @@ function update(tr::SetTrace{RetType, ArgType, TraceType}, (set,)::Tuple, (diff,
 
     if diff isa SetDiff
         for removed_addr in diff.deleted
+            if !haskey(subtraces, removed_addr)
+                println("The keys for `subtraces` are ", collect(keys(subtraces)))
+                error("Given diff saying address $removed_addr was removed, but this was not one of the previous addresses!")
+            end
             subtr = subtraces[removed_addr]
             subtraces = dissoc(subtraces, removed_addr)
             score -= get_score(subtr)
