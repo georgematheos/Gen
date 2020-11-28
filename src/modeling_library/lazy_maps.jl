@@ -4,8 +4,6 @@ struct LazyValMapDict{K, V} <: AbstractDict{K, V}
     keys_to_vals
 end
 function LazyValMapDict(f, keys_to_vals::AbstractDict{K, V}) where {K, V}
-    # println()
-    # println("for $V, stacktrace is: ")
     # display(stacktrace())
     valtype = Core.Compiler.return_type(f, Tuple{V})
     LazyValMapDict{K, valtype}(f, keys_to_vals)
@@ -15,9 +13,6 @@ function LazyValMapDict(f, keys_to_vals::Vector{V}) where {V}
     LazyValMapDict{K, valtype}(f, keys_to_vals)
     LazyValMapDict{Int, valtype}(f, keys_to_vals)
 end
-# function Base.convert(::Type{LazyValMapDict{K, V}}, lvm::LazyValMapDict{K_old, V_old}) where {K, V, K_old, V_old}
-#     @assert V_old <: V
-#     LazyValMapDict{K, V}(lvm.f, )
 
 Base.getindex(dict::LazyValMapDict, key) = dict.f(dict.keys_to_vals[key])
 function Base.get(dict::LazyValMapDict, key, v)
