@@ -116,7 +116,7 @@ end
     s2 = Set(["a", "b", "c", "d"])
     s3 = Set([0.1, 0.2, 0.3, 0.4])
     tr = simulate(tracked_product_set, ([s1, s2, s3],))
-    @test get_retval(tr) == Set(Iterators.product(s1, s2, s3))
+    @test get_retval(tr) == PersistentSet(Iterators.product(s1, s2, s3))
 
     s1 = Set([1, 2, 3])
     s2 = Set(["a", "b", "c", "d", "e"])
@@ -130,14 +130,14 @@ end
     @test retdiff isa SetDiff
     @test retdiff.added == Set([(i, "e", j) for i=1:3, j=0.1:0.1:0.4])
     @test retdiff.deleted == Set([(4, a, b) for a in ("a", "b", "c", "d"), b=0.1:0.1:0.4])
-    @test get_retval(new_tr) == Set(Iterators.product(s1, s2, s3))
+    @test get_retval(new_tr) == PersistentSet(Iterators.product(s1, s2, s3))
 end
 
 @testset "tracked union" begin
     s1 = Set([1, 2, 3, 4])
     s2 = Set(["a", "b", "c", "d"])
     tr = simulate(tracked_union, (Dict(1 => s1, 2 => s2),))
-    @test get_retval(tr) == Set([1, 2, 3, 4, "a", "b", "c", "d"])
+    @test get_retval(tr) == PersistentSet([1, 2, 3, 4, "a", "b", "c", "d"])
 
     tr2 = simulate(tracked_union, (s1, s2))
     @test get_retval(tr) == get_retval(tr2)
@@ -147,7 +147,7 @@ end
     new_tr, _, retdiff, _ = update(tr, (Dict(1 => s1, 2 => s2),), (diff,), EmptyAddressTree())
     @test isempty(retdiff.added)
     @test retdiff.deleted == Set([4])
-    @test get_retval(new_tr) == Set([1, 2, 3, "a", "b", "c", "d"])
+    @test get_retval(new_tr) == PersistentSet([1, 2, 3, "a", "b", "c", "d"])
 
     new_tr2, _, retdiff2, _ = update(tr2, (s1, s2), (SetDiff(Set(), Set([4])),), EmptyAddressTree())
     @test get_retval(new_tr2) == get_retval(new_tr)
@@ -162,5 +162,5 @@ end
     new_tr, _, retdiff, _ = update(tr, (Dict(1 => s1, 2 => s2, 3 => s3),), (diff,), EmptyAddressTree())
     @test retdiff.deleted == Set(["a", 4])
     @test retdiff.added == Set([.1,.2,.3,.4,"e"])
-    @test get_retval(new_tr) == Set([1, 2, 3, "b", "c", "d", "e", .1, .2, .3, .4])
+    @test get_retval(new_tr) == PersistentSet([1, 2, 3, "b", "c", "d", "e", .1, .2, .3, .4])
 end
