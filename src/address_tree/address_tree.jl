@@ -241,6 +241,41 @@ include("static_address_tree.jl")
 include("choicemap.jl")
 include("selection.jl")
 
+"""
+    regenchoicemap()
+
+Construct an empty mutable update specification which may constrain
+values at addresses and specify for other values to be regenerated.
+"""
+function regenchoicemap()
+    DynamicAddressTree{Union{Value, SelectionLeaf}}()
+end
+"""
+    regenchoicemap(tuples...)
+
+Construct a mutable update specification which may constrain
+values at addresses and specify for other values to be regenerated.
+This update spec will be initialized with:
+- For each `(addr, selection::Selection)` in `tuples`, the given `selection` will be at address `addr`
+- For each `(addr, val)` in `tuples` (where `val` is not a `Selection), the given value
+will be at address `addr`
+"""
+function regenchoicemap(tuples...)
+    rcm = regenchoicemap()
+    for (addr, val) in tuples
+        rcm[addr] = val
+    end
+    rcm
+end
+
+function Base.setindex!(rcm::DynamicAddressTree{Union{Value, SelectionLeaf}}, sel::Selection, addr)
+    set_subtree!(rcm, addr, sel)
+end
+function Base.setindex!(rcm::DynamicAddressTree{Union{Value, SelectionLeaf}}, val, addr)
+    set_subtree!(rcm, addr, Value(val))
+end
+
 export get_subtree, get_subtrees_shallow
 export EmptyAddressTree, Value, AllSelection, SelectionLeaf, CustomUpdateSpec, UpdateSpec
 export get_address_schema
+export regenchoicemap

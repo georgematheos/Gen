@@ -382,3 +382,29 @@ end
     set_subtree!(t, :d, Value(7))
     @test UnderlyingChoices(t) == choicemap((:c => :b, 5), (:c => :c, 6), (:d, 7))
 end
+
+@testset "regenchoicemap" begin
+    rcm = regenchoicemap()
+    rcm[:a] = 5
+    rcm[:b] = EmptySelection()
+    rcm[:c] = AllSelection()
+    @test get_subtree(rcm, :a) isa Value
+    @test get_subtree(rcm, :b) isa EmptySelection
+    @test get_subtree(rcm, :c) isa AllSelection
+
+    rcm = regenchoicemap(
+        (:a => :a, 5),
+        (:a => :b, EmptySelection()),
+        (:a => :c => :a, AllSelection()),
+        (:a => :c => :b, 10)
+    )
+    rcm[:a => :c => :c] = 5
+    rcm[:a => :c => :d] = AllSelection()
+
+    for addr in (:b, :c => :a, :c => :d)
+        @test get_subtree(rcm, :a => addr) isa Selection
+    end
+    for addr in (:a, :c => :b, :c => :c)
+        @test get_subtree(rcm, :a => addr) isa Value
+    end
+end
