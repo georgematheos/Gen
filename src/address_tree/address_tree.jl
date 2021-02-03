@@ -268,6 +268,19 @@ function regenchoicemap(tuples...)
     rcm
 end
 
+"""
+    all_values_deep(tree::Gen.AddressTree)
+
+Returns an iterator over all values in the `tree`, where each value is the contents of a `Value` leaf node.
+"""
+all_values_deep(v::Value) = (get_value(v),)
+all_values_deep(::AddressTreeLeaf) = ()
+function all_values_deep(tree::AddressTree)
+    Iterators.flatten(
+        (all_values_deep(subtree) for (_, subtree) in get_subtrees_shallow(tree))
+    )
+end
+
 function Base.setindex!(rcm::DynamicAddressTree{Union{Value, SelectionLeaf}}, sel::Selection, addr)
     set_subtree!(rcm, addr, sel)
 end
@@ -278,4 +291,4 @@ end
 export get_subtree, get_subtrees_shallow
 export EmptyAddressTree, Value, AllSelection, SelectionLeaf, CustomUpdateSpec, UpdateSpec
 export get_address_schema
-export regenchoicemap
+export regenchoicemap, all_values_deep

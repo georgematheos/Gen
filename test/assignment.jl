@@ -408,3 +408,13 @@ end
         @test get_subtree(rcm, :a => addr) isa Value
     end
 end
+
+@testset "all values deep" begin
+    rcm = regenchoicemap(
+        (:a, 1),
+        (:b => :c, 2),
+        (:b => :d, 3),
+        (:b => :e, AllSelection())
+    )
+    @test Set(all_values_deep(rcm)) == Set([1, 2, 3])
+end
