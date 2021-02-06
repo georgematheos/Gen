@@ -226,10 +226,30 @@ function _show_pretty(io::IO, tree::AddressTree, pre, vert_bars::Tuple)
     end
 end
 
+function _show_pretty_terse(io, tree::AddressTree)
+    print(io, "{")
+
+    itr = collect(get_subtrees_shallow(tree))
+    for (i, (addr, subtree)) in enumerate(itr)
+        print(io, "$(repr(addr)) => ")
+        _show_pretty_terse(io, subtree)
+        if i != length(itr)
+            print(io, ", ")
+        end
+    end
+
+    print(io, "}")
+end
+_show_pretty_terse(io, tree::AddressTreeLeaf) = Base.show_default(io, tree)
+
 function Base.show(io::IO, ::MIME"text/plain", tree::AddressTree)
     _show_pretty(io, tree, 0, ())
 end
 Base.show(io::IO, ::MIME"text/plain", t::AddressTreeLeaf) = print(io, t)
+
+function Base.show(io::IO, tree::AddressTree)
+    _show_pretty_terse(io, tree)
+end
 
 function nonempty_subtree_itr(itr)
     ((addr, subtree) for (addr, subtree) in itr if !isempty(subtree))
