@@ -120,7 +120,7 @@ Base.iterate(set::LazyBijectionSetMap) = iterate(_iterator(set))
 Base.iterate(set::LazyBijectionSetMap, st) = iterate(_iterator(set), st)
 
 """
-    lazy_bijection_set_map(f, keys)
+    lazy_bijection_set_map(f, f_inv, keys)
 
 Return a set of elements `f(key)` for each key in keys,
 where `f` is a bijection with inverse `f_inv`.
