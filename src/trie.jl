@@ -2,7 +2,7 @@
 # Trie #
 ##################
 
-struct Trie{K,V} <: AddressTree{Value}
+struct Trie{K,V} # <: AddressTree{Value}
     leaf_nodes::Dict{K,V}
     internal_nodes::Dict{K,Trie{K,V}}
 end
